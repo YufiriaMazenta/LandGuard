@@ -1,9 +1,10 @@
 package pers.yufiria.landguard.command;
 
-import crypticlib.CrypticLibBukkit;
+import crypticlib.CommonPlayer;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
+import crypticlib.command.annotation.Subcommand;
 import crypticlib.lang.entry.StringLangEntry;
 import crypticlib.perm.PermInfo;
 import org.bukkit.Bukkit;
@@ -16,91 +17,220 @@ import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.database.entity.GroupRoleData;
-import pers.yufiria.landguard.group.GroupFailureReason;
 import pers.yufiria.landguard.group.GroupOpResult;
 import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.Roles;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 
 /**
  * {@code /land group ...}：用户组建/解散、邀请体系、成员管理、自定义角色、个人领地转让给组。
+ * 子命令交由框架节点树分派（{@code @Subcommand}）：每个动作独立权限节点、独立补全，
+ * 参数列表已去掉动作名（{@code args.get(0)} 即该动作的第一个参数）。
  * 所有写操作走 {@link GroupService}（单写线程原子落库），命令层只做参数解析与反馈。
  */
 public final class GroupCommand extends CommandNode {
 
+    private static final String PERM_PREFIX = "landguard.command.group.";
     public static final GroupCommand INSTANCE = new GroupCommand();
 
     private GroupCommand() {
         super(CommandInfo.builder("group").permission(new PermInfo("landguard.command.group")).build());
     }
 
+    // ================= 子命令节点 =================
+
+    @Subcommand
+    CommandNode create = action("create", this::create);
+    @Subcommand
+    CommandNode disband = action("disband", (player, args) ->
+        groupNameOp(player, args, GroupService.INSTANCE::disband, Languages.COMMAND_GROUP_DISBAND_SUCCESS),
+        ownedGroups());
+    @Subcommand
+    CommandNode invite = action("invite", this::invite, managedGroupsThenPlayers());
+    @Subcommand
+    CommandNode accept = action("accept", (player, args) ->
+        groupNameOp(player, args, GroupService.INSTANCE::acceptInvite, Languages.COMMAND_GROUP_ACCEPT_SUCCESS),
+        invitedGroups());
+    @Subcommand
+    CommandNode deny = action("deny", (player, args) ->
+        groupNameOp(player, args, GroupService.INSTANCE::denyInvite, Languages.COMMAND_GROUP_DENY_SUCCESS),
+        invitedGroups());
+    @Subcommand
+    CommandNode leave = action("leave", (player, args) ->
+        groupNameOp(player, args, GroupService.INSTANCE::leave, Languages.COMMAND_GROUP_LEAVE_SUCCESS),
+        memberGroups());
+    @Subcommand
+    CommandNode kick = action("kick", this::kick, managedGroupsThenPlayers());
+    @Subcommand
+    CommandNode transfer = action("transfer", this::transfer, ownedGroupsThenPlayers());
+    @Subcommand
+    CommandNode role = new RoleNode();
+    @Subcommand
+    CommandNode rename = action("rename", this::rename, managedGroups());
+    @Subcommand
+    CommandNode list = action("list", (player, args) -> list(player));
+    @Subcommand
+    CommandNode info = action("info", this::info, (player, args) ->
+        args.size() > 1 ? List.of() : CommandCompletions.allGroups());
+
+    /** 无子命令或子命令名未命中时，框架回落到本节点：输出用法。 */
     @Override
-    public void execute(@NotNull Invoker invoker, List<String> args) {
+    public void execute(@NotNull Invoker invoker, @NotNull List<String> args) {
         if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
             return;
         }
-        Player player = (Player) CommandUtils.invoker2Sender(invoker);
+        LangUtils.sendLang(invoker, Languages.COMMAND_GROUP_USAGE);
+    }
+
+    private static CommandNode action(String name, BiConsumer<CommonPlayer, List<String>> handler) {
+        return new PlayerOnlyCommand(PERM_PREFIX + name, name, handler);
+    }
+
+    private static CommandNode action(String name, BiConsumer<CommonPlayer, List<String>> handler,
+                                      PlayerOnlyCommand.TabCompleter completer) {
+        return new PlayerOnlyCommand(PERM_PREFIX + name, name, handler, completer);
+    }
+
+    // ================= 参数补全 =================
+
+    /** 第一参数为该玩家已加入的用户组名。 */
+    private static PlayerOnlyCommand.TabCompleter memberGroups() {
+        return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.memberGroups(player.uniqueId());
+    }
+
+    /** 第一参数为该玩家拥有的用户组名（组内角色为 owner）。 */
+    private static PlayerOnlyCommand.TabCompleter ownedGroups() {
+        return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.ownedGroups(player.uniqueId());
+    }
+
+    /** 第一参数为该玩家有待处理邀请的用户组名。 */
+    private static PlayerOnlyCommand.TabCompleter invitedGroups() {
+        return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.invitedGroups(player.uniqueId());
+    }
+
+    /** 第一参数为该玩家可管理的用户组名（组内角色为 owner 或 manager）。 */
+    private static PlayerOnlyCommand.TabCompleter managedGroups() {
+        return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.managedGroups(player.uniqueId());
+    }
+
+    /** 第一参数为可管理的用户组名，第二参数为在线玩家名。 */
+    private static PlayerOnlyCommand.TabCompleter managedGroupsThenPlayers() {
+        return (player, args) -> switch (args.size()) {
+            case 1 -> CommandCompletions.managedGroups(player.uniqueId());
+            case 2 -> CommandCompletions.onlinePlayers();
+            default -> List.of();
+        };
+    }
+
+    /** 第一参数为该玩家拥有的用户组名，第二参数为在线玩家名。 */
+    private static PlayerOnlyCommand.TabCompleter ownedGroupsThenPlayers() {
+        return (player, args) -> switch (args.size()) {
+            case 1 -> CommandCompletions.ownedGroups(player.uniqueId());
+            case 2 -> CommandCompletions.onlinePlayers();
+            default -> List.of();
+        };
+    }
+
+    /** 第一参数为可管理的用户组名，第二参数为在线玩家名，第三参数为该组的角色标识。 */
+    private static PlayerOnlyCommand.TabCompleter managedGroupsThenPlayerThenRole() {
+        return (player, args) -> switch (args.size()) {
+            case 1 -> CommandCompletions.managedGroups(player.uniqueId());
+            case 2 -> CommandCompletions.onlinePlayers();
+            case 3 -> CommandCompletions.groupRoles(args.get(0));
+            default -> List.of();
+        };
+    }
+
+    /** {@code /land group role create|assign ...}：二级节点，本身只负责缺参提示。 */
+    static final class RoleNode extends CommandNode {
+
+        @Subcommand
+        CommandNode create = new PlayerOnlyCommand(PERM_PREFIX + "role.create", "create",
+            (player, args) -> INSTANCE.createRole(player, args), managedGroups());
+        @Subcommand
+        CommandNode assign = new PlayerOnlyCommand(PERM_PREFIX + "role.assign", "assign",
+            (player, args) -> INSTANCE.assignRole(player, args), managedGroupsThenPlayerThenRole());
+
+        RoleNode() {
+            super(CommandInfo.builder("role").permission(new PermInfo(PERM_PREFIX + "role")).build());
+        }
+
+        @Override
+        public void execute(@NotNull Invoker invoker, @NotNull List<String> args) {
+            if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
+                return;
+            }
+            LangUtils.sendLang(invoker, Languages.COMMAND_GROUP_USAGE);
+        }
+
+        @Override
+        public void onNoPerm(@NotNull Invoker invoker, @NotNull List<String> args) {
+            LangUtils.sendLang(invoker, Languages.COMMAND_NO_PERM);
+        }
+    }
+
+    // ================= 动作实现 =================
+
+    private void create(CommonPlayer player, List<String> args) {
         if (args.isEmpty()) {
             LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
             return;
         }
-        String sub = args.get(0).toLowerCase(java.util.Locale.ROOT);
-        switch (sub) {
-            case "create" -> create(player, args);
-            case "disband" -> groupNameOp(player, args, GroupService.INSTANCE::disband, Languages.COMMAND_GROUP_DISBAND_SUCCESS);
-            case "invite" -> invite(player, args);
-            case "accept" -> groupNameOp(player, args, GroupService.INSTANCE::acceptInvite, Languages.COMMAND_GROUP_ACCEPT_SUCCESS);
-            case "deny" -> groupNameOp(player, args, GroupService.INSTANCE::denyInvite, Languages.COMMAND_GROUP_DENY_SUCCESS);
-            case "leave" -> groupNameOp(player, args, GroupService.INSTANCE::leave, Languages.COMMAND_GROUP_LEAVE_SUCCESS);
-            case "kick" -> kick(player, args);
-            case "transfer" -> transfer(player, args);
-            case "role" -> role(player, args);
-            case "giveclaim" -> giveClaim(player, args);
-            case "list" -> list(player);
-            case "info" -> info(player, args);
-            default -> LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-        }
+        // 第一参数是标识符；展示名可选，缺省时由服务层回退为标识符
+        String groupId = args.getFirst();
+        String name = args.size() > 1 ? String.join(" ", args.subList(1, args.size())) : groupId;
+        run(player, GroupService.INSTANCE.createGroup(player.uniqueId(), groupId, name),
+            Languages.COMMAND_GROUP_CREATE_SUCCESS, Map.of("<group>", name));
     }
 
-    private void create(Player player, List<String> args) {
+    private void rename(CommonPlayer player, List<String> args) {
+        if (args.size() < 2) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_RENAME_USAGE);
+            return;
+        }
+        String groupId = args.getFirst();
+        String name = String.join(" ", args.subList(1, args.size()));
+        run(player, GroupService.INSTANCE.renameGroup(player.uniqueId(), groupId, name),
+            Languages.COMMAND_GROUP_RENAME_SUCCESS, Map.of("<group>", name));
+    }
+
+    private void invite(CommonPlayer player, List<String> args) {
         if (args.size() < 2) {
             LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
             return;
         }
-        String name = args.get(1);
-        run(player, GroupService.INSTANCE.createGroup(player.getUniqueId(), name),
-            Languages.COMMAND_GROUP_CREATE_SUCCESS, Map.of("group", name));
-    }
-
-    private void invite(Player player, List<String> args) {
-        if (args.size() < 3) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-            return;
-        }
-        String groupName = args.get(1);
-        UUID target = resolveTarget(args.get(2));
+        String groupName = args.get(0);
+        UUID target = resolveTarget(args.get(1));
         if (target == null) {
             LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
             return;
         }
-        GroupService.INSTANCE.invite(player.getUniqueId(), groupName, target)
-            .whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                if (!player.isOnline() || throwable != null || result == null) {
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
+        GroupService.INSTANCE.invite(player.uniqueId(), groupName, target)
+            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
                 if (result.success()) {
                     LangUtils.sendLang(player, Languages.COMMAND_GROUP_INVITE_SENT, Map.of(
-                        "group", groupName, "player", args.get(2)));
+                        "<group>", groupName, "<player>", args.get(1)));
                     Player online = Bukkit.getPlayer(target);
                     if (online != null) {
+                        // 被邀请者需要用标识符执行 accept，故邀请消息里必须带上它
+                        GroupData invited = GroupService.findById(DataStore.INSTANCE.snapshot(), groupName);
                         LangUtils.sendLang(online, Languages.COMMAND_GROUP_INVITE_RECEIVED, Map.of(
-                            "group", groupName,
-                            "leader", player.getName()));
+                            "<group>", invited == null ? groupName : invited.getName(),
+                            "<group_id>", groupName,
+                            "<leader>", player.name()));
                     }
                 } else {
                     sendFailure(player, result);
@@ -108,129 +238,104 @@ public final class GroupCommand extends CommandNode {
             }));
     }
 
-    private void kick(Player player, List<String> args) {
-        if (args.size() < 3) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-            return;
-        }
-        UUID target = resolveTarget(args.get(2));
-        if (target == null) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
-            return;
-        }
-        run(player, GroupService.INSTANCE.kick(player.getUniqueId(), args.get(1), target),
-            Languages.COMMAND_GROUP_KICK_SUCCESS, Map.of("group", args.get(1), "player", args.get(2)));
-    }
-
-    private void transfer(Player player, List<String> args) {
-        if (args.size() < 3) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-            return;
-        }
-        UUID target = resolveTarget(args.get(2));
-        if (target == null) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
-            return;
-        }
-        run(player, GroupService.INSTANCE.transferLeadership(player.getUniqueId(), args.get(1), target),
-            Languages.COMMAND_GROUP_TRANSFER_SUCCESS, Map.of("group", args.get(1), "player", args.get(2)));
-    }
-
-    private void role(Player player, List<String> args) {
-        // /land group role create <组> <roleId> <priority> [显示名...]
-        // /land group role assign <组> <玩家> <roleId>
-        if (args.size() < 3) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-            return;
-        }
-        String action = args.get(1).toLowerCase(java.util.Locale.ROOT);
-        if ("create".equals(action)) {
-            if (args.size() < 6) {
-                LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-                return;
-            }
-            int priority;
-            try {
-                priority = Integer.parseInt(args.get(4));
-            } catch (NumberFormatException e) {
-                LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_ROLE_ID_INVALID);
-                return;
-            }
-            String displayName = String.join(" ", args.subList(5, args.size()));
-            String roleId = args.get(3);
-            String groupName = args.get(2);
-            run(player, GroupService.INSTANCE.createRole(player.getUniqueId(), groupName, roleId, priority, displayName),
-                Languages.COMMAND_GROUP_ROLE_CREATED, Map.of("group", groupName, "role", roleId));
-        } else if ("assign".equals(action)) {
-            // /land group role assign <组> <玩家> <roleId>
-            if (args.size() < 5) {
-                LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-                return;
-            }
-            String groupName = args.get(2);
-            UUID target = resolveTarget(args.get(3));
-            if (target == null) {
-                LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
-                return;
-            }
-            String roleId = args.get(4);
-            run(player, GroupService.INSTANCE.assignRole(player.getUniqueId(), groupName, target, roleId),
-                Languages.COMMAND_GROUP_ROLE_ASSIGNED,
-                Map.of("group", groupName, "player", args.get(3), "role", roleId));
-        } else {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-        }
-    }
-
-    private void giveClaim(Player player, List<String> args) {
+    private void kick(CommonPlayer player, List<String> args) {
         if (args.size() < 2) {
             LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
             return;
         }
-        String groupName = args.get(1);
-        run(player, GroupService.INSTANCE.giveClaim(
-                player.getUniqueId(), groupName,
-                player.getWorld().getUID(),
-                player.getLocation().getBlockX() >> 4,
-                player.getLocation().getBlockZ() >> 4),
-            Languages.COMMAND_GROUP_GIVECLAIM_SUCCESS, Map.of("group", groupName));
+        UUID target = resolveTarget(args.get(1));
+        if (target == null) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
+            return;
+        }
+        run(player, GroupService.INSTANCE.kick(player.uniqueId(), args.get(0), target),
+            Languages.COMMAND_GROUP_KICK_SUCCESS, Map.of("<group>", args.get(0), "<player>", args.get(1)));
     }
 
-    private void list(Player player) {
+    private void transfer(CommonPlayer player, List<String> args) {
+        if (args.size() < 2) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
+            return;
+        }
+        UUID target = resolveTarget(args.get(1));
+        if (target == null) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
+            return;
+        }
+        run(player, GroupService.INSTANCE.transferLeadership(player.uniqueId(), args.get(0), target),
+            Languages.COMMAND_GROUP_TRANSFER_SUCCESS, Map.of("<group>", args.get(0), "<player>", args.get(1)));
+    }
+
+    /** {@code /land group role create <组> <roleId> <priority> [显示名...]} */
+    private void createRole(CommonPlayer player, List<String> args) {
+        if (args.size() < 3) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
+            return;
+        }
+        int priority;
+        try {
+            priority = Integer.parseInt(args.get(2));
+        } catch (NumberFormatException e) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_ROLE_ID_INVALID);
+            return;
+        }
+        String groupName = args.get(0);
+        String roleId = args.get(1);
+        String displayName = String.join(" ", args.subList(3, args.size()));
+        run(player, GroupService.INSTANCE.createRole(player.uniqueId(), groupName, roleId, priority, displayName),
+            Languages.COMMAND_GROUP_ROLE_CREATED, Map.of("<group>", groupName, "<role>", roleId));
+    }
+
+    /** {@code /land group role assign <组> <玩家> <roleId>} */
+    private void assignRole(CommonPlayer player, List<String> args) {
+        if (args.size() < 3) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
+            return;
+        }
+        String groupName = args.get(0);
+        UUID target = resolveTarget(args.get(1));
+        if (target == null) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_TARGET_NOT_FOUND);
+            return;
+        }
+        String roleId = args.get(2);
+        run(player, GroupService.INSTANCE.assignRole(player.uniqueId(), groupName, target, roleId),
+            Languages.COMMAND_GROUP_ROLE_ASSIGNED,
+            Map.of("<group>", groupName, "<player>", args.get(1), "<role>", roleId));
+    }
+
+    private void list(CommonPlayer player) {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        List<String> owned = new java.util.ArrayList<>();
+        List<GroupData> owned = new ArrayList<>();
         for (Map.Entry<String, Map<UUID, String>> entry : snapshot.groupMembers().entrySet()) {
-            if (!entry.getValue().containsKey(player.getUniqueId())) {
+            if (!entry.getValue().containsKey(player.uniqueId())) {
                 continue;
             }
             GroupData group = snapshot.groups().get(entry.getKey());
             if (group != null) {
-                owned.add(group.getName());
+                owned.add(group);
             }
         }
         if (owned.isEmpty()) {
             LangUtils.sendLang(player, Languages.COMMAND_GROUP_LIST_EMPTY);
             return;
         }
-        LangUtils.sendLang(player, Languages.COMMAND_GROUP_LIST_HEADER, Map.of("size", String.valueOf(owned.size())));
-        for (String name : owned) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_LIST_ENTRY, Map.of("group", name));
+        LangUtils.sendLang(player, Languages.COMMAND_GROUP_LIST_HEADER, Map.of("<size>", String.valueOf(owned.size())));
+        for (GroupData group : owned) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_LIST_ENTRY, Map.of(
+                "<group>", group.getName(), "<group_id>", group.getGroupId()));
         }
     }
 
-    private void info(Player player, List<String> args) {
+    private void info(CommonPlayer player, List<String> args) {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        GroupData group = null;
-        if (args.size() >= 2) {
-            for (GroupData candidate : snapshot.groups().values()) {
-                if (candidate.getName().equalsIgnoreCase(args.get(1))) {
-                    group = candidate;
-                    break;
-                }
-            }
+        GroupData group;
+        if (!args.isEmpty()) {
+            group = GroupService.findById(snapshot, args.getFirst());
         } else {
+            group = null;
             for (Map.Entry<String, Map<UUID, String>> entry : snapshot.groupMembers().entrySet()) {
-                if (entry.getValue().containsKey(player.getUniqueId())) {
+                if (entry.getValue().containsKey(player.uniqueId())) {
                     group = snapshot.groups().get(entry.getKey());
                     break;
                 }
@@ -244,7 +349,7 @@ public final class GroupCommand extends CommandNode {
         Map<String, GroupRoleData> roles = snapshot.groupRoles().getOrDefault(group.getGroupId(), Map.of());
         StringBuilder memberNames = new StringBuilder();
         for (UUID member : members.keySet()) {
-            if (memberNames.length() > 0) {
+            if (!memberNames.isEmpty()) {
                 memberNames.append(", ");
             }
             memberNames.append(nameOf(member));
@@ -255,31 +360,33 @@ public final class GroupCommand extends CommandNode {
             roleNames.append(", ").append(role.getName());
         }
         LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_HEADER);
-        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_NAME, Map.of("group", group.getName()));
-        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_LEADER, Map.of("leader", nameOf(group.getLeaderUuid())));
-        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_MEMBERS, Map.of("members", memberNames.toString()));
-        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_ROLES, Map.of("roles", roleNames.toString()));
+        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_NAME, Map.of(
+            "<group>", group.getName(), "<group_id>", group.getGroupId()));
+        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_LEADER, Map.of("<leader>", nameOf(group.getLeaderUuid())));
+        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_MEMBERS, Map.of("<members>", memberNames.toString()));
+        LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_ROLES, Map.of("<roles>", roleNames.toString()));
     }
 
     private interface GroupNameOp {
 
-        java.util.concurrent.CompletableFuture<GroupOpResult> run(UUID actor, String groupName);
+        CompletableFuture<GroupOpResult> run(UUID actor, String groupName);
 
     }
 
-    private void groupNameOp(Player player, List<String> args, GroupNameOp op, StringLangEntry successEntry) {
-        if (args.size() < 2) {
+    private void groupNameOp(CommonPlayer player, List<String> args, GroupNameOp op, StringLangEntry successEntry) {
+        if (args.isEmpty()) {
             LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
             return;
         }
-        String groupName = args.get(1);
-        run(player, op.run(player.getUniqueId(), groupName), successEntry, Map.of("group", groupName));
+        String groupName = args.getFirst();
+        run(player, op.run(player.uniqueId(), groupName), successEntry, Map.of("<group>", groupName));
     }
 
-    private void run(Player player, java.util.concurrent.CompletableFuture<GroupOpResult> future,
+    private void run(CommonPlayer player, CompletableFuture<GroupOpResult> future,
                      StringLangEntry successEntry, Map<String, String> formats) {
-        future.whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-            if (!player.isOnline() || throwable != null || result == null) {
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
+        future.whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                 return;
             }
             if (result.success()) {
@@ -290,26 +397,31 @@ public final class GroupCommand extends CommandNode {
         }));
     }
 
-    static void sendFailure(Player player, GroupOpResult result) {
-        StringLangEntry entry = switch (result.failureReason()) {
-            case NAME_TAKEN -> Languages.COMMAND_GROUP_FAIL_NAME_TAKEN;
-            case INVALID_NAME -> Languages.COMMAND_GROUP_FAIL_INVALID_NAME;
-            case GROUP_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_NOT_FOUND;
-            case NOT_LEADER -> Languages.COMMAND_GROUP_FAIL_NOT_LEADER;
-            case NOT_MANAGER -> Languages.COMMAND_GROUP_FAIL_NOT_MANAGER;
-            case NOT_MEMBER -> Languages.COMMAND_GROUP_FAIL_NOT_MEMBER;
-            case TARGET_NOT_MEMBER -> Languages.COMMAND_GROUP_FAIL_TARGET_NOT_MEMBER;
-            case ALREADY_MEMBER -> Languages.COMMAND_GROUP_FAIL_ALREADY_MEMBER;
-            case NO_INVITE -> Languages.COMMAND_GROUP_FAIL_NO_INVITE;
-            case LEADER_CANNOT_LEAVE -> Languages.COMMAND_GROUP_FAIL_LEADER_CANNOT_LEAVE;
-            case CANNOT_KICK -> Languages.COMMAND_GROUP_FAIL_CANNOT_KICK;
-            case ROLE_EXISTS -> Languages.COMMAND_GROUP_FAIL_ROLE_EXISTS;
-            case ROLE_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_ROLE_NOT_FOUND;
-            case ROLE_ID_INVALID -> Languages.COMMAND_GROUP_FAIL_ROLE_ID_INVALID;
-            case ROLE_BUILTIN -> Languages.COMMAND_GROUP_FAIL_ROLE_BUILTIN;
-            case CLAIM_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_CLAIM_NOT_FOUND;
-            case NOT_CLAIM_OWNER -> Languages.COMMAND_GROUP_FAIL_NOT_CLAIM_OWNER;
-        };
+    /** 用户组操作失败 → 语言条目的统一映射；命令层与 GUI 转让路径共用。 */
+    public static void sendFailure(CommonPlayer player, GroupOpResult result) {
+        StringLangEntry entry = null;
+        if (result.failureReason() != null) {
+            entry = switch (result.failureReason()) {
+                case KEY_TAKEN -> Languages.COMMAND_GROUP_FAIL_KEY_TAKEN;
+                case INVALID_KEY -> Languages.COMMAND_GROUP_FAIL_INVALID_KEY;
+                case INVALID_NAME -> Languages.COMMAND_GROUP_FAIL_INVALID_NAME;
+                case GROUP_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_NOT_FOUND;
+                case NOT_LEADER -> Languages.COMMAND_GROUP_FAIL_NOT_LEADER;
+                case NOT_MANAGER -> Languages.COMMAND_GROUP_FAIL_NOT_MANAGER;
+                case NOT_MEMBER -> Languages.COMMAND_GROUP_FAIL_NOT_MEMBER;
+                case TARGET_NOT_MEMBER -> Languages.COMMAND_GROUP_FAIL_TARGET_NOT_MEMBER;
+                case ALREADY_MEMBER -> Languages.COMMAND_GROUP_FAIL_ALREADY_MEMBER;
+                case NO_INVITE -> Languages.COMMAND_GROUP_FAIL_NO_INVITE;
+                case LEADER_CANNOT_LEAVE -> Languages.COMMAND_GROUP_FAIL_LEADER_CANNOT_LEAVE;
+                case CANNOT_KICK -> Languages.COMMAND_GROUP_FAIL_CANNOT_KICK;
+                case ROLE_EXISTS -> Languages.COMMAND_GROUP_FAIL_ROLE_EXISTS;
+                case ROLE_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_ROLE_NOT_FOUND;
+                case ROLE_ID_INVALID -> Languages.COMMAND_GROUP_FAIL_ROLE_ID_INVALID;
+                case ROLE_BUILTIN -> Languages.COMMAND_GROUP_FAIL_ROLE_BUILTIN;
+                case CLAIM_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_CLAIM_NOT_FOUND;
+                case NOT_CLAIM_OWNER -> Languages.COMMAND_GROUP_FAIL_NOT_CLAIM_OWNER;
+            };
+        }
         LangUtils.sendLang(player, entry);
     }
 

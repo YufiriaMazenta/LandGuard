@@ -1,12 +1,12 @@
 package pers.yufiria.landguard.command;
 
+import crypticlib.CommonPlayer;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
 import crypticlib.perm.PermInfo;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataSnapshot;
@@ -34,15 +34,15 @@ public final class ClaimListCommand extends CommandNode {
         if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
             return;
         }
-        Player player = (Player) CommandUtils.invoker2Sender(invoker);
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
+        CommonPlayer player = invoker.asPlayer();
+        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
         Set<String> claimIds = snapshot.claimsByOwner().getOrDefault(owner, Set.of());
         if (claimIds.isEmpty()) {
             LangUtils.sendLang(player, Languages.COMMAND_LIST_EMPTY);
             return;
         }
-        LangUtils.sendLang(player, Languages.COMMAND_LIST_HEADER, Map.of("size", String.valueOf(claimIds.size())));
+        LangUtils.sendLang(player, Languages.COMMAND_LIST_HEADER, Map.of("<size>", String.valueOf(claimIds.size())));
         for (String claimId : claimIds) {
             ClaimData claim = snapshot.claimsById().get(claimId);
             if (claim == null) {
@@ -51,9 +51,9 @@ public final class ClaimListCommand extends CommandNode {
             World world = Bukkit.getWorld(claim.getWorldUuid());
             int chunks = snapshot.chunksByClaim().getOrDefault(claimId, Set.of()).size();
             LangUtils.sendLang(player, Languages.COMMAND_LIST_ENTRY, Map.of(
-                "name", claim.getName() == null ? claimId : claim.getName(),
-                "world", world == null ? claim.getWorldUuid().toString().substring(0, 8) : world.getName(),
-                "chunks", String.valueOf(chunks)
+                "<name>", claim.getName() == null ? claimId : claim.getName(),
+                "<world>", world == null ? claim.getWorldUuid().toString().substring(0, 8) : world.getName(),
+                "<chunks>", String.valueOf(chunks)
             ));
         }
     }

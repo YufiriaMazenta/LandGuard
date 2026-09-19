@@ -1,5 +1,6 @@
 package pers.yufiria.landguard.command;
 
+import crypticlib.CommonPlayer;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -44,12 +45,13 @@ public final class ClaimInfoCommand extends CommandNode {
         if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
             return;
         }
-        Player player = (Player) CommandUtils.invoker2Sender(invoker);
+        CommonPlayer player = invoker.asPlayer();
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
         ChunkLoc standing = ChunkLoc.of(
-            player.getWorld().getUID(),
-            player.getLocation().getBlockX() >> 4,
-            player.getLocation().getBlockZ() >> 4
+            bukkitPlayer.getWorld().getUID(),
+            bukkitPlayer.getLocation().getBlockX() >> 4,
+            bukkitPlayer.getLocation().getBlockZ() >> 4
         );
         String claimId = snapshot.claimIdByChunk().get(standing);
         if (claimId == null) {
@@ -70,14 +72,14 @@ public final class ClaimInfoCommand extends CommandNode {
 
         LangUtils.sendLang(player, Languages.COMMAND_INFO_HEADER);
         LangUtils.sendLang(player, Languages.COMMAND_INFO_NAME, Map.of(
-            "name", claim.getName() == null ? claimId : claim.getName()));
+            "<name>", claim.getName() == null ? claimId : claim.getName()));
         LangUtils.sendLang(player, Languages.COMMAND_INFO_OWNER, Map.of(
-            "owner", ownerName, "type", claim.getOwnerType()));
+            "<owner>", ownerName, "<type>", LangUtils.ownerTypeLabel(player.locale(), claim.getOwnerType())));
         LangUtils.sendLang(player, Languages.COMMAND_INFO_WORLD, Map.of(
-            "world", world == null ? claim.getWorldUuid().toString().substring(0, 8) : world.getName()));
-        LangUtils.sendLang(player, Languages.COMMAND_INFO_CHUNKS, Map.of("chunks", String.valueOf(chunks)));
+            "<world>", world == null ? claim.getWorldUuid().toString().substring(0, 8) : world.getName()));
+        LangUtils.sendLang(player, Languages.COMMAND_INFO_CHUNKS, Map.of("<chunks>", String.valueOf(chunks)));
         LangUtils.sendLang(player, Languages.COMMAND_INFO_CREATED, Map.of(
-            "created", DATE_FORMAT.format(Instant.ofEpochMilli(claim.getCreatedAt()))));
+            "<created>", DATE_FORMAT.format(Instant.ofEpochMilli(claim.getCreatedAt()))));
     }
 
     @Override

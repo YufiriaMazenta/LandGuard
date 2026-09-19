@@ -1,6 +1,6 @@
 package pers.yufiria.landguard.command;
 
-import crypticlib.CrypticLibBukkit;
+import crypticlib.CommonPlayer;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -15,6 +15,7 @@ import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 
@@ -31,16 +32,17 @@ public final class UnclaimCommand extends CommandNode {
         if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
             return;
         }
-        Player player = (Player) CommandUtils.invoker2Sender(invoker);
+        CommonPlayer player = invoker.asPlayer();
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         ChunkLoc standing = ChunkLoc.of(
-            player.getWorld().getUID(),
-            player.getLocation().getBlockX() >> 4,
-            player.getLocation().getBlockZ() >> 4
+            bukkitPlayer.getWorld().getUID(),
+            bukkitPlayer.getLocation().getBlockX() >> 4,
+            bukkitPlayer.getLocation().getBlockZ() >> 4
         );
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
+        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
         ClaimService.INSTANCE.unclaim(owner, List.of(standing))
-            .whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                if (!player.isOnline() || throwable != null || result == null) {
+            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
                 if (result.success()) {

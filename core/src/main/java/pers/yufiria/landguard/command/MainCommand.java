@@ -8,7 +8,6 @@ import crypticlib.command.CommandTree;
 import crypticlib.command.annotation.Command;
 import crypticlib.command.annotation.Subcommand;
 import crypticlib.perm.PermInfo;
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import pers.yufiria.landguard.config.PluginConfigs;
 import pers.yufiria.landguard.ui.ClaimListMenu;
@@ -37,8 +36,8 @@ public class MainCommand extends CommandTree {
         if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
             return;
         }
-        Player player = (Player) CommandUtils.invoker2Sender(invoker);
-        new ClaimListMenu(player).openMenu();
+        // 打开 GUI 需要 Bukkit 玩家对象（crypticlib UI 以 Bukkit Player 为入口）
+        new ClaimListMenu(CommandUtils.bukkitPlayer(invoker.asPlayer())).openMenu();
     }
 
     @Subcommand
@@ -58,6 +57,15 @@ public class MainCommand extends CommandTree {
 
     @Subcommand
     CommandNode info = ClaimInfoCommand.INSTANCE;
+
+    @Subcommand
+    CommandNode boundary = BoundaryCommand.INSTANCE;
+
+    @Subcommand
+    CommandNode rename = RenameCommand.INSTANCE;
+
+    @Subcommand
+    CommandNode transfer = TransferCommand.INSTANCE;
 
     @Subcommand
     CommandNode group = GroupCommand.INSTANCE;

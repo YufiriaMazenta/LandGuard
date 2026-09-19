@@ -1,5 +1,6 @@
 package pers.yufiria.landguard.command;
 
+import crypticlib.CommonPlayer;
 import crypticlib.CrypticLibPlugin;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
@@ -10,8 +11,6 @@ import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
 import crypticlib.perm.PermInfo;
 import crypticlib.scheduler.CrypticLibRunnable;
-import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.LandGuard;
@@ -71,7 +70,7 @@ public final class ReloadCommand extends CommandNode implements LifecycleTask {
 
     @Override
     public void onLifecycle(CrypticLibPlugin crypticLibPlugin, LifecyclePhase lifecyclePhase) {
-        CommandSender sender = getReloadSender();
+        UUID senderUuid = reloadSenderUuid;
         //如果正确重载了，取消超时任务
         if (reloadTimeoutCallback != null) {
             reloadTimeoutCallback.cancel();
@@ -79,17 +78,13 @@ public final class ReloadCommand extends CommandNode implements LifecycleTask {
         }
         reloadSenderUuid = null;
         reloading.set(false);
-        if (sender != null) {
-            LangUtils.sendLang(sender, Languages.COMMAND_RELOAD_SUCCESS);
+        if (senderUuid == null || senderUuid.equals(Invoker.CONSOLE_UUID)) {
+            LangUtils.info(Languages.COMMAND_RELOAD_SUCCESS);
+            return;
         }
-    }
-
-    private @Nullable CommandSender getReloadSender() {
-        UUID uuid = reloadSenderUuid;
-        if (uuid == null || uuid.equals(Invoker.CONSOLE_UUID)) {
-            return Bukkit.getConsoleSender();
-        }
-        return Bukkit.getPlayer(uuid);
+        // 只通知仍在线的玩家；已离线则不补发
+        CommonPlayer.fromUuid(senderUuid).ifPresent(player ->
+            LangUtils.sendLang(player, Languages.COMMAND_RELOAD_SUCCESS));
     }
 
     public boolean isReloading() {
