@@ -10,10 +10,16 @@ import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.PlayerData;
 import pers.yufiria.landguard.database.entity.PlayerQuotaData;
+import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
+import pers.yufiria.landguard.owner.ClaimOwner;
+import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner;
 import pers.yufiria.landguard.util.ConfigValues;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,6 +42,9 @@ public enum ClaimService {
 
     private static final long UNLIMITED = Long.MAX_VALUE;
 
+    /** 领地名长度上限，与用户组名上限保持一致。 */
+    private static final int MAX_CLAIM_NAME_LENGTH = 32;
+
     /**
      * 认领一批区块（首个领地自动创建，同世界已有领地则扩容到该领地）。
      *
@@ -46,7 +55,7 @@ public enum ClaimService {
                                                   String defaultName, boolean admin) {
         // 管理领地统一归属虚拟 server 实体：调用方传入的 owner 仅用于普通认领
         OwnerRef effectiveOwner = admin
-            ? OwnerRef.of(BuiltinOwnerTypes.SERVER, pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner.ID)
+            ? OwnerRef.of(BuiltinOwnerTypes.SERVER, ServerClaimOwner.ID)
             : owner;
         AtomicReference<ClaimOpResult> resultRef = new AtomicReference<>();
         return DataStore.INSTANCE.mutate(current -> {
@@ -76,7 +85,7 @@ public enum ClaimService {
                     resultRef.set(ClaimOpResult.failed(ClaimFailureReason.INVALID_TARGETS));
                     return current;
                 }
-                capacity = pers.yufiria.landguard.group.GroupService.INSTANCE.groupCapacity(current, owner.identifier());
+                capacity = GroupService.INSTANCE.groupCapacity(current, owner.identifier());
                 // 组已用区块完全由快照派生（无独立额度表）
             }
 
@@ -119,7 +128,7 @@ public enum ClaimService {
                 available = availableChunks(playerUuid, next);
             } else if (owner.typeKey().equals(BuiltinOwnerTypes.GROUP)) {
                 available = Math.max(0L,
-                    pers.yufiria.landguard.group.GroupService.INSTANCE.groupCapacity(next, owner.identifier())
+                    GroupService.INSTANCE.groupCapacity(next, owner.identifier())
                         - ClaimEngine.currentClaimedChunks(next, owner));
             } else {
                 available = UNLIMITED;
@@ -283,6 +292,146 @@ public enum ClaimService {
         }).thenApply(snapshot -> resultRef.get());
     }
 
+    // ================= 领地改名 =================
+
+    /** 去掉首尾空白；null 原样返回，合法性由 {@link #isValidClaimName} 判断。 */
+    public static String normalizeClaimName(String raw) {
+        return raw == null ? null : raw.trim();
+    }
+
+    /** 领地名必须非空且不超过 {@value #MAX_CLAIM_NAME_LENGTH} 字符；允许与其他领地重名。 */
+    public static boolean isValidClaimName(String name) {
+        return name != null && !name.isEmpty() && name.length() <= MAX_CLAIM_NAME_LENGTH;
+    }
+
+    /**
+     * 判断某玩家是否是这块领地的 owner：个人领地=本人，用户组领地=owner（领袖）角色。
+     * 命令层预检与 GUI 按钮显隐共用本方法。
+     */
+    public static boolean isOwner(ClaimData claim, UUID player) {
+        if (claim == null || player == null) {
+            return false;
+        }
+        ClaimOwner owner = ClaimOwnerRegistry.INSTANCE.resolve(
+            OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()));
+        return owner != null && Roles.OWNER.equals(owner.roleOf(player));
+    }
+
+    /**
+     * 重命名领地：仅该领地的 owner 可操作（授权在进入写线程前用已发布快照判定，
+     * 避免在单写线程内解析用户组角色造成嵌套写入）。
+     */
+    public CompletableFuture<ClaimOpResult> renameClaim(UUID actor, String claimId, String newName) {
+        ClaimData claim = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
+        if (claim == null) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
+        }
+        if (!isOwner(claim, actor)) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_OWNER));
+        }
+        String name = normalizeClaimName(newName);
+        if (!isValidClaimName(name)) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.INVALID_NAME));
+        }
+        AtomicReference<ClaimOpResult> resultRef = new AtomicReference<>();
+        return DataStore.INSTANCE.mutate(current -> {
+            ClaimData fresh = LandDaoManager.INSTANCE.claimDao().queryForId(claimId);
+            if (fresh == null) {
+                resultRef.set(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
+                return current;
+            }
+            fresh.setName(name);
+            LandDaoManager.INSTANCE.claimDao().update(fresh);
+            resultRef.set(ClaimOpResult.renamed(claimId));
+            return DataStore.rebuildSnapshot();
+        }).thenApply(snapshot -> resultRef.get());
+    }
+
+    // ================= 领地转让 =================
+
+    /**
+     * 玩家自助把脚下领地转让给另一个玩家：仅该领地的 owner 可操作（个人领地=本人，用户组领地=领袖）。
+     * 状态处理与管理员强制转让一致：admin 标记/豁免/欠费/警告/孤儿状态重置，lastActiveAt 刷新，
+     * 领地银行余额随领地保留；双方已用额度按实际持有量校正（允许目标暂时超出容量）。
+     * 额外拒绝会破坏「同一所有者在每个世界最多一块领地」约束的目标玩家。
+     */
+    public CompletableFuture<ClaimOpResult> transferClaim(UUID actor, String claimId, UUID target) {
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        ClaimData claim = snapshot.claimsById().get(claimId);
+        if (claim == null) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
+        }
+        if (!isOwner(claim, actor)) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_OWNER));
+        }
+        if (BuiltinOwnerTypes.PLAYER.equals(claim.getOwnerType())
+            && claim.getOwnerId().equals(target.toString())) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.ALREADY_OWNED));
+        }
+        if (ownsClaimInWorld(snapshot, target, claim.getWorldUuid())) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.TARGET_HAS_CLAIM));
+        }
+        AtomicReference<ClaimOpResult> resultRef = new AtomicReference<>();
+        return DataStore.INSTANCE.mutate(current -> {
+            LandDaoManager daos = LandDaoManager.INSTANCE;
+            ClaimData fresh = daos.claimDao().queryForId(claimId);
+            if (fresh == null) {
+                resultRef.set(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
+                return current;
+            }
+            String oldOwnerType = fresh.getOwnerType();
+            String oldOwnerId = fresh.getOwnerId();
+            long now = System.currentTimeMillis();
+            ClaimData transferred = new ClaimData(
+                fresh.getClaimId(), fresh.getWorldUuid(), BuiltinOwnerTypes.PLAYER, target.toString(),
+                fresh.getName(), false, fresh.getCreatedAt(), now,
+                fresh.getBankBalance(), false, 0L, 0L, 0L, 0L
+            );
+            daos.claimDao().update(transferred);
+            if (daos.playerDao().queryForId(target) == null) {
+                daos.playerDao().create(new PlayerData(
+                    target, ConfigValues.get(ClaimConfigs.START_CHUNKS), 0, now));
+            }
+
+            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 新所有者：已用额度至少覆盖实际持有（允许超出容量，不拒绝转让）
+            OwnerRef targetRef = OwnerRef.of(BuiltinOwnerTypes.PLAYER, target.toString());
+            PlayerQuotaData targetQuota = loadOrCreateQuota(target);
+            targetQuota.setUsedChunks(Math.max(
+                targetQuota.getUsedChunks(), ClaimEngine.currentClaimedChunks(next, targetRef)));
+            daos.playerQuotaDao().update(targetQuota);
+            // 原个人所有者：额度按剩余实际持有量校正
+            UUID oldUuid = BuiltinOwnerTypes.PLAYER.equals(oldOwnerType) ? parseUuid(oldOwnerId) : null;
+            if (oldUuid != null && !oldUuid.equals(target)) {
+                PlayerQuotaData oldQuota = daos.playerQuotaDao().queryForId(oldUuid);
+                if (oldQuota != null) {
+                    oldQuota.setUsedChunks(Math.max(0, ClaimEngine.currentClaimedChunks(
+                        next, OwnerRef.of(BuiltinOwnerTypes.PLAYER, oldOwnerId))));
+                    daos.playerQuotaDao().update(oldQuota);
+                }
+            }
+            resultRef.set(ClaimOpResult.transferred(claimId,
+                next.chunksByClaim().getOrDefault(claimId, Set.of()).size()));
+            return next;
+        }).thenApply(snapshot2 -> resultRef.get());
+    }
+
+    /** 目标玩家在该世界是否已有领地；用于避免转让破坏「同一所有者每个世界最多一块领地」。 */
+    private static boolean ownsClaimInWorld(DataSnapshot snapshot, UUID target, UUID worldUuid) {
+        Set<String> owned = snapshot.claimsByOwner()
+            .get(OwnerRef.of(BuiltinOwnerTypes.PLAYER, target.toString()));
+        if (owned == null) {
+            return false;
+        }
+        for (String ownedClaimId : owned) {
+            ClaimData other = snapshot.claimsById().get(ownedClaimId);
+            if (other != null && worldUuid.equals(other.getWorldUuid())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
      * 玩家进服：确保玩家数据存在（发放初始额度）并刷新最后登录时间。
      */
@@ -332,13 +481,13 @@ public enum ClaimService {
      */
     public CompletableFuture<Long> availableChunks(OwnerRef owner) {
         if (owner.typeKey().equals(BuiltinOwnerTypes.GROUP)) {
-            java.util.concurrent.atomic.AtomicLong groupAvailable = new java.util.concurrent.atomic.AtomicLong();
+            AtomicLong groupAvailable = new AtomicLong();
             return DataStore.INSTANCE.mutate(current -> {
                 if (!current.groups().containsKey(owner.identifier())) {
                     groupAvailable.set(0L);
                 } else {
                     groupAvailable.set(Math.max(0L,
-                        pers.yufiria.landguard.group.GroupService.INSTANCE.groupCapacity(current, owner.identifier())
+                        GroupService.INSTANCE.groupCapacity(current, owner.identifier())
                             - ClaimEngine.currentClaimedChunks(current, owner)));
                 }
                 return current;
@@ -358,7 +507,7 @@ public enum ClaimService {
         }).thenApply(snapshot -> availableRef.get());
     }
 
-    private long availableChunks(UUID uuid, DataSnapshot snapshot) throws java.sql.SQLException {
+    private long availableChunks(UUID uuid, DataSnapshot snapshot) throws SQLException {
         PlayerData playerData = LandDaoManager.INSTANCE.playerDao().queryForId(uuid);
         long capacity = capacityOf(playerData);
         PlayerQuotaData quota = loadOrCreateQuota(uuid);
@@ -374,7 +523,7 @@ public enum ClaimService {
         return (long) playerData.getAccruedChunks() + playerData.getBoughtChunks();
     }
 
-    private PlayerQuotaData loadOrCreateQuota(UUID uuid) throws java.sql.SQLException {
+    private PlayerQuotaData loadOrCreateQuota(UUID uuid) throws SQLException {
         var quotaDao = LandDaoManager.INSTANCE.playerQuotaDao();
         PlayerQuotaData quota = quotaDao.queryForId(uuid);
         if (quota == null) {

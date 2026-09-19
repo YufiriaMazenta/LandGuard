@@ -9,6 +9,7 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
 ## Features
 
 - **Pure chunk claims**: claim, unclaim, radius batch, walk-to-auto-claim, particle boundary visualization
+- **Entry notices**: configurable action bar or chat message when you step into a claim, plus particle boundary rendering (with both a server-level and a per-player toggle)
 - **Organization-first**: built-in groups (invites / roles / transfer / claim gifting) plus an open ownership SPI for third-party organization systems
 - **Role × flag model**: owner / manager / member / visitor and custom roles, each with independently configurable behavioral and natural protection flags
 - **Comprehensive protection vectors**: place / break / container / door / redstone / crafting / vehicle / animal / interaction entity / planting / harvest / item / bank; PvP / explosion / fire spread / fluid flow / piston / mob spawn / mob grief / trample. Cross-boundary pistons and fluids are decided by the target chunk
@@ -41,20 +42,32 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
 | `/land unclaim` | Unclaim the standing chunk |
 | `/land list` | List your claims |
 | `/land info` | Information about the claim you stand on |
-| `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|role\|giveclaim\|list\|info` | Group management |
+| `/land boundary` | Toggle particle boundary rendering on claim entry (per player, on by default) |
+| `/land rename <new name>` | Rename the claim you stand on (owner only; spaces allowed, up to 32 characters) |
+| `/land transfer --player <player>` / `--group <group id>` | Transfer the claim you stand on to another player or group (owner only) |
+| `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|rename\|role\|list\|info` | Group management (`transfer` transfers group leadership, `rename` changes the display name) |
 | `/land buy <amount>` / `/land sell <amount>` | Buy/sell chunk quota (economy required) |
 | `/land bank [deposit\|withdraw <amount>]` | Claim bank (economy required) |
-| `/land admin claim\|unclaim\|transfer\|release\|exempt\|info\|orphans\|run` | Administration |
+| `/land admin claim\|unclaim\|transfer\|release\|exempt\|rename\|info\|orphans\|run` | Administration |
 | `/land reload` / `/land version` | Reload / version |
 
 Aliases: `landguard`, `lg` (configurable in `config.yml`).
 
 ## Permissions
 
+Each subcommand is granted independently (ungranted subcommands are hidden from tab completion); all nodes default to OP except `landguard.bypass`.
+
 | Node | Default | Description |
 |---|---|---|
-| `landguard.command` | true | Use the main command |
-| `landguard.command.admin` | OP | Administration commands |
+| `landguard.command` | true | Use the main `/land` command |
+| `landguard.command.claim` / `unclaim` / `list` / `info` / `boundary` / `rename` / `transfer` | OP | Claim / unclaim / claim list / claim info / boundary toggle / rename claim / transfer claim |
+| `landguard.command.reload` / `version` | OP | Reload config / show version |
+| `landguard.command.buy` / `sell` / `bank` | OP | Buy blocks / sell blocks / claim bank (requires Vault) |
+| `landguard.command.group` | OP | Root of the `/land group` subtree (prints usage with no args) |
+| `landguard.command.group.<action>` | OP | `create`, `disband`, `invite`, `accept`, `deny`, `leave`, `kick`, `transfer`, `rename`, `role`, `list`, `info` |
+| `landguard.command.group.role.create` / `.assign` | OP | Create a custom role / assign a role |
+| `landguard.command.admin` | OP | Root of the `/land admin` subtree (prints usage with no args) |
+| `landguard.command.admin.<action>` | OP | `claim`, `unclaim`, `transfer`, `release`, `exempt`, `rename`, `info`, `orphans`, `run` |
 | `landguard.bypass` | **false (including OPs)** | Bypass all behavioral protection checks; must be granted explicitly |
 
 ## Developers: plug in your own organization system
