@@ -7,3 +7,8 @@ build/
 .jdks/
 .testserver/
 bin/
+
+# 本地工具与编辑器配置
+.trae/
+.vscode/
+smoke-test.ps1
