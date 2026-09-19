@@ -1,5 +1,7 @@
 package pers.yufiria.landguard.data;
 
+import org.bukkit.Chunk;
+
 import java.util.UUID;
 
 /**
@@ -13,7 +15,7 @@ public record ChunkLoc(UUID worldUuid, int x, int z) {
     }
 
     /**
-     * 与 org.bukkit.Chunk#getChunkKey 相同的打包方式，便于调试与互转。
+     * 与 Chunk#getChunkKey 相同的打包方式，便于调试与互转。
      */
     public long chunkKey() {
         return chunkKey(x, z);

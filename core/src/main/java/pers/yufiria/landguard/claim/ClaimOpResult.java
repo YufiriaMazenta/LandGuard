@@ -26,4 +26,12 @@ public record ClaimOpResult(
         return new ClaimOpResult(true, null, claimId, affectedChunks, refundedChunks, availableChunks);
     }
 
+    public static ClaimOpResult renamed(String claimId) {
+        return new ClaimOpResult(true, null, claimId, 0, 0, -1L);
+    }
+
+    public static ClaimOpResult transferred(String claimId, int affectedChunks) {
+        return new ClaimOpResult(true, null, claimId, affectedChunks, 0, -1L);
+    }
+
 }

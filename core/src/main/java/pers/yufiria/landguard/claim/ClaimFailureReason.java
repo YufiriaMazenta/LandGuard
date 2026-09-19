@@ -15,5 +15,11 @@ public enum ClaimFailureReason {
     /** 目标区块不在任何领地内 */
     NOT_CLAIMED,
     /** 目标区块属于其他所有者 */
-    NOT_OWNER
+    NOT_OWNER,
+    /** 领地名非法（空或超过长度上限） */
+    INVALID_NAME,
+    /** 领地已属于该玩家，无需转让 */
+    ALREADY_OWNED,
+    /** 目标玩家在该世界已有领地（同一所有者每个世界只允许一块） */
+    TARGET_HAS_CLAIM
 }

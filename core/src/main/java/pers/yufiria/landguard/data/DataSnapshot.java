@@ -1,5 +1,6 @@
 package pers.yufiria.landguard.data;
 
+import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.database.entity.GroupRoleData;
@@ -83,7 +84,7 @@ public record DataSnapshot(
         return Collections.unmodifiableMap(result);
     }
 
-    public @org.jetbrains.annotations.Nullable ClaimData claimAt(UUID worldUuid, int chunkX, int chunkZ) {
+    public @Nullable ClaimData claimAt(UUID worldUuid, int chunkX, int chunkZ) {
         String claimId = claimIdByChunk.get(ChunkLoc.of(worldUuid, chunkX, chunkZ));
         return claimId == null ? null : claimsById.get(claimId);
     }

@@ -28,6 +28,7 @@ import org.bukkit.entity.ItemFrame;
 import org.bukkit.inventory.EquipmentSlot;
 import pers.yufiria.landguard.protection.BuiltinFlags;
 import pers.yufiria.landguard.protection.ProtectionFlag;
+import pers.yufiria.landguard.protection.ProtectionQueries;
 
 /**
  * 行为类实体交互 + 自然类怪物生成/改变方块。
@@ -144,7 +145,7 @@ public enum EntityProtectionListener implements Listener {
     }
 
     private boolean natural(Block block, ProtectionFlag flag) {
-        return pers.yufiria.landguard.protection.ProtectionQueries
+        return ProtectionQueries
             .queryNatural(block.getWorld().getUID(), block.getX() >> 4, block.getZ() >> 4, flag).allowed();
     }
 

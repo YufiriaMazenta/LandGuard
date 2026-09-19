@@ -8,6 +8,7 @@ import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
 
 import java.sql.SQLException;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -48,7 +49,7 @@ public final class ClaimRelease {
         if (claim == null) {
             return null;
         }
-        int chunks = snapshot.chunksByClaim().getOrDefault(claimId, java.util.Set.of()).size();
+        int chunks = snapshot.chunksByClaim().getOrDefault(claimId, Set.of()).size();
 
         var chunkDelete = daos.claimChunkDao().deleteBuilder();
         chunkDelete.where(w -> w.equals("claim_id", claimId));

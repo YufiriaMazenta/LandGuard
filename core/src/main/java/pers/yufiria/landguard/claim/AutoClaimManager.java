@@ -1,7 +1,10 @@
 package pers.yufiria.landguard.claim;
 
+import crypticlib.BukkitPlayer;
+import crypticlib.CommonPlayer;
 import crypticlib.CrypticLibBukkit;
 import crypticlib.listener.EventListener;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -9,8 +12,11 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.util.CommandUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,7 +31,7 @@ public enum AutoClaimManager implements Listener {
 
     private static final long FAILURE_THROTTLE_MILLIS = 3000L;
 
-    private final java.util.Set<UUID> enabled = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> enabled = ConcurrentHashMap.newKeySet();
     private final ConcurrentHashMap<UUID, Long> lastFailureNotice = new ConcurrentHashMap<>();
 
     public boolean toggle(UUID uuid) {
@@ -51,10 +57,10 @@ public enum AutoClaimManager implements Listener {
         if (!enabled.contains(uuid)) {
             return;
         }
-        if (event.getTo() == null || sameChunk(event)) {
+        if (sameChunk(event)) {
             return;
         }
-        attemptClaim(player, event.getTo().getChunk().getX(), event.getTo().getChunk().getZ());
+        attemptClaim(CommandUtils.commonPlayer(player), event.getTo().getChunk().getX(), event.getTo().getChunk().getZ());
     }
 
     private boolean sameChunk(PlayerMoveEvent event) {
@@ -62,22 +68,23 @@ public enum AutoClaimManager implements Listener {
             && event.getFrom().getBlockZ() >> 4 == event.getTo().getBlockZ() >> 4;
     }
 
-    private void attemptClaim(Player player, int chunkX, int chunkZ) {
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
-        List<ChunkLoc> targets = List.of(ChunkLoc.of(player.getWorld().getUID(), chunkX, chunkZ));
-        ClaimService.INSTANCE.claim(owner, player.getWorld().getUID(), targets, player.getName(), false)
+    private void attemptClaim(CommonPlayer player, int chunkX, int chunkZ) {
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
+        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
+        List<ChunkLoc> targets = List.of(ChunkLoc.of(bukkitPlayer.getWorld().getUID(), chunkX, chunkZ));
+        ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, player.name(), false)
             .whenComplete((result, throwable) -> {
                 if (throwable != null || result == null) {
                     return;
                 }
-                pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                    if (!player.isOnline()) {
+                Schedulers.onPlayer(bukkitPlayer, () -> {
+                    if (!bukkitPlayer.isOnline()) {
                         return;
                     }
                     if (result.success()) {
-                        ClaimBoundaryVisualizer.show(player, targets);
+                        ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
                         ClaimMessages.claimSuccess(player, result);
-                    } else if (shouldNotify(player.getUniqueId())) {
+                    } else if (shouldNotify(player.uniqueId())) {
                         ClaimMessages.failure(player, result.failureReason());
                     }
                 });

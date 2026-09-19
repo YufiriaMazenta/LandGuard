@@ -3,11 +3,16 @@ package pers.yufiria.landguard.protection;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -16,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.world.WorldMock;
+import org.mockito.Mockito;
+import pers.yufiria.landguard.LandGuard;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
@@ -53,7 +60,7 @@ public class BehaviorListenerMockTest {
     private Plugin plugin;
     private PlayerMock alice;
     private PlayerMock outsider;
-    private final List<org.bukkit.event.Listener> registered = new ArrayList<>();
+    private final List<Listener> registered = new ArrayList<>();
 
     @BeforeAll
     static void flags() {
@@ -78,8 +85,8 @@ public class BehaviorListenerMockTest {
 
     @AfterEach
     void tearDown() throws Exception {
-        for (org.bukkit.event.Listener listener : registered) {
-            org.bukkit.event.HandlerList.unregisterAll(listener);
+        for (Listener listener : registered) {
+            HandlerList.unregisterAll(listener);
         }
         registered.clear();
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.PLAYER));
@@ -87,7 +94,7 @@ public class BehaviorListenerMockTest {
         MockBukkit.unmock();
     }
 
-    private void register(PluginManager pm, org.bukkit.event.Listener listener) {
+    private void register(PluginManager pm, Listener listener) {
         pm.registerEvents(listener, plugin);
         registered.add(listener);
     }
@@ -100,11 +107,11 @@ public class BehaviorListenerMockTest {
 
     private static void installPluginInstance() throws Exception {
         // 拒绝反馈路径需要 LandGuard.instance()；mock 提供描述，语言节点未加载时回退空文本
-        pers.yufiria.landguard.LandGuard pluginMock =
-            org.mockito.Mockito.mock(pers.yufiria.landguard.LandGuard.class);
-        org.mockito.Mockito.when(pluginMock.getDescription()).thenReturn(
-            new org.bukkit.plugin.PluginDescriptionFile("LandGuard", "1.0.0.0", "x.LandGuard"));
-        Field instanceField = pers.yufiria.landguard.LandGuard.class.getDeclaredField("INSTANCE");
+        LandGuard pluginMock =
+            Mockito.mock(LandGuard.class);
+        Mockito.when(pluginMock.getDescription()).thenReturn(
+            new PluginDescriptionFile("LandGuard", "1.0.0.0", "x.LandGuard"));
+        Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
         instanceField.setAccessible(true);
         instanceField.set(null, pluginMock);
     }
@@ -128,7 +135,7 @@ public class BehaviorListenerMockTest {
         );
     }
 
-    private BlockBreakEvent breakEvent(org.bukkit.entity.Player player, int x, Material type) {
+    private BlockBreakEvent breakEvent(Player player, int x, Material type) {
         Block block = world.getBlockAt(x, 64, 0);
         block.setType(type);
         return new BlockBreakEvent(block, player);
@@ -164,7 +171,7 @@ public class BehaviorListenerMockTest {
         PlayerInteractEvent openChest = new PlayerInteractEvent(
             outsider, Action.RIGHT_CLICK_BLOCK, null, chest, BlockFace.UP, EquipmentSlot.HAND);
         pm.callEvent(openChest);
-        assertTrue(openChest.useInteractedBlock() == org.bukkit.event.Event.Result.DENY,
+        assertTrue(openChest.useInteractedBlock() == Event.Result.DENY,
             "非成员开容器拒绝");
 
         Block table = world.getBlockAt(9, 64, 0);
@@ -172,7 +179,7 @@ public class BehaviorListenerMockTest {
         PlayerInteractEvent craft = new PlayerInteractEvent(
             outsider, Action.RIGHT_CLICK_BLOCK, null, table, BlockFace.UP, EquipmentSlot.HAND);
         pm.callEvent(craft);
-        assertFalse(craft.useInteractedBlock() == org.bukkit.event.Event.Result.DENY,
+        assertFalse(craft.useInteractedBlock() == Event.Result.DENY,
             "visitor 默认可用工作台（crafting=true）");
 
         Block wildChest = world.getBlockAt(85, 64, 0);
@@ -180,7 +187,7 @@ public class BehaviorListenerMockTest {
         PlayerInteractEvent wild = new PlayerInteractEvent(
             outsider, Action.RIGHT_CLICK_BLOCK, null, wildChest, BlockFace.UP, EquipmentSlot.HAND);
         pm.callEvent(wild);
-        assertFalse(wild.useInteractedBlock() == org.bukkit.event.Event.Result.DENY,
+        assertFalse(wild.useInteractedBlock() == Event.Result.DENY,
             "野外容器不拦截");
     }
 

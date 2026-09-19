@@ -3,12 +3,13 @@ package pers.yufiria.landguard.config;
 import crypticlib.config.ConfigHandler;
 import crypticlib.config.node.impl.bukkit.BooleanConfig;
 import crypticlib.config.node.impl.bukkit.DoubleConfig;
+import pers.yufiria.landguard.economy.EconomyProvider;
 
 import java.util.List;
 
 /**
  * economy.yml：经济功能总开关与额度买卖单价。
- * 经济实际可用性 = ENABLED 且运行期存在 {@link pers.yufiria.landguard.economy.EconomyProvider}
+ * 经济实际可用性 = ENABLED 且运行期存在 {@link EconomyProvider}
  * （即安装了 Vault 及任意经济插件）。
  */
 @ConfigHandler(path = "economy.yml")

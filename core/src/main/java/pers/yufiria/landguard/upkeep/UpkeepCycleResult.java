@@ -1,5 +1,6 @@
 package pers.yufiria.landguard.upkeep;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -25,7 +26,7 @@ public record UpkeepCycleResult(
      * 合并两个周期结果（upkeep/不活跃周期 + 孤儿周期），通知按参数顺序保序拼接。
      */
     public static UpkeepCycleResult merge(UpkeepCycleResult first, UpkeepCycleResult second) {
-        List<UpkeepNotice> notices = new java.util.ArrayList<>(first.notices());
+        List<UpkeepNotice> notices = new ArrayList<>(first.notices());
         notices.addAll(second.notices());
         return new UpkeepCycleResult(
             List.copyOf(notices),

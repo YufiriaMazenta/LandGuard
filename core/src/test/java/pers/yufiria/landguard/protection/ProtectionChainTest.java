@@ -15,6 +15,7 @@ import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
+import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerProvider;
@@ -22,11 +23,13 @@ import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.owner.OwnerType;
 import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.owner.builtin.PlayerClaimOwnerProvider;
 
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -68,14 +71,14 @@ public class ProtectionChainTest {
             CAROL, "R1",
             DAVE, "R2"
         ))));
-        ClaimOwnerRegistry.INSTANCE.register(pers.yufiria.landguard.owner.builtin.PlayerClaimOwnerProvider.INSTANCE);
+        ClaimOwnerRegistry.INSTANCE.register(PlayerClaimOwnerProvider.INSTANCE);
     }
 
     @AfterEach
     void tearDown() throws Exception {
         ClaimOwnerRegistry.INSTANCE.unregister(GUILD_TYPE);
         ClaimOwnerRegistry.INSTANCE.unregister(
-            new pers.yufiria.landguard.owner.OwnerType(pers.yufiria.landguard.owner.BuiltinOwnerTypes.PLAYER));
+            new OwnerType(BuiltinOwnerTypes.PLAYER));
         if (connection != null) {
             DataStore.INSTANCE.joinReload();
             connection.close();
@@ -102,7 +105,7 @@ public class ProtectionChainTest {
             ChunkLoc loc = ChunkLoc.of(claim.getWorldUuid(), baseX++, 0);
             byChunk.put(loc, claim.getClaimId());
             chunksByClaim.put(claim.getClaimId(), Set.of(loc));
-            byOwner.computeIfAbsent(OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()), k -> new java.util.LinkedHashSet<>())
+            byOwner.computeIfAbsent(OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()), k -> new LinkedHashSet<>())
                 .add(claim.getClaimId());
         }
         return new DataSnapshot(
@@ -205,9 +208,9 @@ public class ProtectionChainTest {
         LandDaoManager.INSTANCE.claimDao().create(
             new ClaimData("c2", WORLD, GUILD_TYPE.key(), "g", "C2", false, now, now, 0, false));
         LandDaoManager.INSTANCE.claimChunkDao().create(
-            new pers.yufiria.landguard.database.entity.ClaimChunkData("c1", WORLD, 0, 0));
+            new ClaimChunkData("c1", WORLD, 0, 0));
         LandDaoManager.INSTANCE.claimChunkDao().create(
-            new pers.yufiria.landguard.database.entity.ClaimChunkData("c2", WORLD, 1, 0));
+            new ClaimChunkData("c2", WORLD, 1, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
 
         // c1 的 member 容器覆盖为允许（member 默认矩阵中容器为拒绝）

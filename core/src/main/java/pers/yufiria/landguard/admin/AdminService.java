@@ -2,6 +2,7 @@ package pers.yufiria.landguard.admin;
 
 import pers.yufiria.landguard.claim.ClaimEngine;
 import pers.yufiria.landguard.claim.ClaimRelease;
+import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
@@ -15,13 +16,18 @@ import pers.yufiria.landguard.upkeep.UpkeepCycleResult;
 import pers.yufiria.landguard.upkeep.UpkeepService;
 import pers.yufiria.landguard.util.ConfigValues;
 
+import java.sql.SQLException;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 管理员领域操作（FR-9.1）：整领强制释放、强制转让、逐领地豁免、手动触发回收周期。
  * 所有落库都在 {@link DataStore#mutate} 单写线程内原子完成；认领/放弃批量操作复用
- * {@link pers.yufiria.landguard.claim.ClaimService} 的 admin 路径。
+ * {@link ClaimService} 的 admin 路径。
  */
 public enum AdminService {
 
@@ -31,10 +37,10 @@ public enum AdminService {
      * 强制释放整个领地（任意所有者，含孤儿）。系统回收：个人所有者额度按实际持有校正，不额外扣减。
      */
     public CompletableFuture<AdminOpResult> releaseClaim(String claimId) {
-        java.util.concurrent.atomic.AtomicBoolean found =
-            new java.util.concurrent.atomic.AtomicBoolean(false);
-        java.util.concurrent.atomic.AtomicInteger chunksRef =
-            new java.util.concurrent.atomic.AtomicInteger();
+        AtomicBoolean found =
+            new AtomicBoolean(false);
+        AtomicInteger chunksRef =
+            new AtomicInteger();
         return DataStore.INSTANCE.mutate(current -> {
             ClaimRelease.Released released = ClaimRelease.release(LandDaoManager.INSTANCE, current, claimId);
             if (released == null) {
@@ -54,8 +60,8 @@ public enum AdminService {
      * 转让后双方额度按实际持有量校正（管理操作允许目标暂时超出容量）。
      */
     public CompletableFuture<AdminOpResult> transferClaim(String claimId, UUID target) {
-        java.util.concurrent.atomic.AtomicReference<AdminFailureReason> earlyFailure =
-            new java.util.concurrent.atomic.AtomicReference<>();
+        AtomicReference<AdminFailureReason> earlyFailure =
+            new AtomicReference<>();
         return DataStore.INSTANCE.mutate(current -> {
             LandDaoManager daos = LandDaoManager.INSTANCE;
             ClaimData claim = daos.claimDao().queryForId(claimId);
@@ -120,7 +126,7 @@ public enum AdminService {
                 || !claim.getOwnerId().equals(target.toString())) {
                 return AdminOpResult.failed(AdminFailureReason.INVALID_ARGUMENT);
             }
-            int chunks = next.chunksByClaim().getOrDefault(claimId, java.util.Set.of()).size();
+            int chunks = next.chunksByClaim().getOrDefault(claimId, Set.of()).size();
             return AdminOpResult.ok(claimId, chunks);
         });
     }
@@ -134,6 +140,29 @@ public enum AdminService {
     }
 
     /**
+     * 管理员重命名领地：不校验归属（管理员可强制操作），名字非法返回 INVALID_ARGUMENT。
+     */
+    public CompletableFuture<AdminOpResult> renameClaim(String claimId, String newName) {
+        String name = ClaimService.normalizeClaimName(newName);
+        if (!ClaimService.isValidClaimName(name)) {
+            return CompletableFuture.completedFuture(AdminOpResult.failed(AdminFailureReason.INVALID_ARGUMENT));
+        }
+        AtomicBoolean found = new AtomicBoolean(false);
+        return DataStore.INSTANCE.mutate(current -> {
+            ClaimData claim = LandDaoManager.INSTANCE.claimDao().queryForId(claimId);
+            if (claim == null) {
+                return current;
+            }
+            claim.setName(name);
+            LandDaoManager.INSTANCE.claimDao().update(claim);
+            found.set(true);
+            return DataStore.rebuildSnapshot();
+        }).thenApply(next -> found.get()
+            ? AdminOpResult.ok(claimId, 0)
+            : AdminOpResult.failed(AdminFailureReason.CLAIM_NOT_FOUND));
+    }
+
+    /**
      * 手动执行一轮维护周期（upkeep/不活跃 + 孤儿），返回合并结果。
      */
     public CompletableFuture<UpkeepCycleResult> runMaintenance(long now) {
@@ -142,7 +171,7 @@ public enum AdminService {
                 .thenApply(orphanResult -> UpkeepCycleResult.merge(upkeepResult, orphanResult)));
     }
 
-    private static PlayerQuotaData loadOrCreateQuota(LandDaoManager daos, UUID uuid) throws java.sql.SQLException {
+    private static PlayerQuotaData loadOrCreateQuota(LandDaoManager daos, UUID uuid) throws SQLException {
         PlayerQuotaData quota = daos.playerQuotaDao().queryForId(uuid);
         if (quota == null) {
             quota = new PlayerQuotaData(uuid, 0);

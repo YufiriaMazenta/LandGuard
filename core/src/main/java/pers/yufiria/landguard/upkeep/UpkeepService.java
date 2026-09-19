@@ -1,5 +1,6 @@
 package pers.yufiria.landguard.upkeep;
 
+import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.claim.ClaimRelease;
 import pers.yufiria.landguard.config.UpkeepConfigs;
 import pers.yufiria.landguard.data.DataSnapshot;
@@ -12,6 +13,7 @@ import pers.yufiria.landguard.economy.EconomyService;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.util.ConfigValues;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -165,11 +167,11 @@ public enum UpkeepService {
      * 从领地/组银行扣除 due；余额不足时清零抵费并返回 false。
      * 组领地的时间戳字段仍写在 claim 行（由调用方 update），此处只动银行余额所在行。
      */
-    private boolean chargeBank(LandDaoManager daos, ClaimData claim, double due) throws java.sql.SQLException {
+    private boolean chargeBank(LandDaoManager daos, ClaimData claim, double due) throws SQLException {
         if (BuiltinOwnerTypes.GROUP.equals(claim.getOwnerType())) {
             GroupData group = daos.groupDao().queryForId(claim.getOwnerId());
             if (group == null) {
-                throw new java.sql.SQLException("group owner row missing: " + claim.getOwnerId());
+                throw new SQLException("group owner row missing: " + claim.getOwnerId());
             }
             double balance = group.getBankBalance();
             if (balance + EPS >= due) {
@@ -239,9 +241,9 @@ public enum UpkeepService {
     /**
      * 解析可处理的内置所有者及其最近活跃时间；无法解析（孤儿/第三方类型）返回 null。
      */
-    private @org.jetbrains.annotations.Nullable OwnerActivity resolveOwner(
+    private @Nullable OwnerActivity resolveOwner(
         LandDaoManager daos, DataSnapshot snapshot, ClaimData claim
-    ) throws java.sql.SQLException {
+    ) throws SQLException {
         if (BuiltinOwnerTypes.PLAYER.equals(claim.getOwnerType())) {
             UUID uuid;
             try {

@@ -16,6 +16,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import pers.yufiria.landguard.config.ClaimConfigs;
+import pers.yufiria.landguard.util.ConfigValues;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,17 +58,17 @@ public enum PlayerActivityTracker implements LifecycleTask, Listener {
         }
         lastLocations.clear();
         fractionBanks.clear();
-        int interval = pers.yufiria.landguard.util.ConfigValues.get(ClaimConfigs.ACTIVITY_SAMPLE_INTERVAL_TICKS);
+        int interval = ConfigValues.get(ClaimConfigs.ACTIVITY_SAMPLE_INTERVAL_TICKS);
         if (interval > 0) {
             task = CrypticLibBukkit.scheduler().syncTimer(this::sample, interval, interval);
         }
     }
 
     private void sample() {
-        int intervalTicks = pers.yufiria.landguard.util.ConfigValues.get(ClaimConfigs.ACTIVITY_SAMPLE_INTERVAL_TICKS);
+        int intervalTicks = ConfigValues.get(ClaimConfigs.ACTIVITY_SAMPLE_INTERVAL_TICKS);
         double minMovedSq = Math.pow(
-            pers.yufiria.landguard.util.ConfigValues.get(ClaimConfigs.ACTIVITY_MIN_MOVED_BLOCKS), 2);
-        double chunksPerInterval = pers.yufiria.landguard.util.ConfigValues.get(ClaimConfigs.ACCRUED_CHUNKS_PER_HOUR)
+            ConfigValues.get(ClaimConfigs.ACTIVITY_MIN_MOVED_BLOCKS), 2);
+        double chunksPerInterval = ConfigValues.get(ClaimConfigs.ACCRUED_CHUNKS_PER_HOUR)
             * (intervalTicks / (20D * 3600D));
         // Folia: getLocation/getGameMode 属于实体区域线程，全局定时任务只能逐实体派发采样；
         // Spigot 上 runOnEntity 等价于同步任务。

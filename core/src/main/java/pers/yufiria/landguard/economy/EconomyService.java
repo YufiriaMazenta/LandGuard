@@ -20,6 +20,7 @@ import pers.yufiria.landguard.protection.CheckResult;
 import pers.yufiria.landguard.protection.ProtectionChecker;
 import pers.yufiria.landguard.util.ConfigValues;
 
+import java.sql.SQLException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
@@ -271,7 +272,7 @@ public enum EconomyService {
     /**
      * 组领地钱进组银行，其余进领地银行。调用方位于写线程。
      */
-    private static void addBank(DataSnapshot snapshot, ClaimData claim, double delta) throws java.sql.SQLException {
+    private static void addBank(DataSnapshot snapshot, ClaimData claim, double delta) throws SQLException {
         LandDaoManager daos = LandDaoManager.INSTANCE;
         if (BuiltinOwnerTypes.GROUP.equals(claim.getOwnerType())) {
             GroupData group = daos.groupDao().queryForId(claim.getOwnerId());
@@ -291,7 +292,7 @@ public enum EconomyService {
         return Math.round(value * 100D) / 100D;
     }
 
-    private static void ensurePlayer(UUID player) throws java.sql.SQLException {
+    private static void ensurePlayer(UUID player) throws SQLException {
         var playerDao = LandDaoManager.INSTANCE.playerDao();
         if (playerDao.queryForId(player) == null) {
             playerDao.create(new PlayerData(player, ConfigValues.get(ClaimConfigs.START_CHUNKS), 0,

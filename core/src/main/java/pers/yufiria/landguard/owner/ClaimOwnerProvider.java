@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
+import java.util.UUID;
 
 /**
  * 所有者提供方 SPI。
@@ -31,6 +32,6 @@ public interface ClaimOwnerProvider {
      * 玩家不属于任何实体时返回空集合。
      */
     @NotNull
-    Collection<ClaimOwner> ownersOf(java.util.UUID player);
+    Collection<ClaimOwner> ownersOf(UUID player);
 
 }

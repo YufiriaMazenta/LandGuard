@@ -9,6 +9,7 @@ import pers.yufiria.landguard.owner.OwnerType;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 内置 {@code server} 类型提供方。服务器实体只有一个，且不属于任何玩家。
@@ -30,7 +31,7 @@ public enum ServerClaimOwnerProvider implements ClaimOwnerProvider {
     }
 
     @Override
-    public @NotNull Collection<ClaimOwner> ownersOf(@NotNull java.util.UUID player) {
+    public @NotNull Collection<ClaimOwner> ownersOf(@NotNull UUID player) {
         return List.of();
     }
 

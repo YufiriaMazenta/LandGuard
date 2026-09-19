@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import pers.yufiria.landguard.config.UpkeepConfigs;
+import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimChunkData;
@@ -217,7 +218,7 @@ public class UpkeepCycleIntegrationTest {
         assertEquals(2, expired.notices().get(0).chunks());
         assertNull(fresh(id));
         assertFalse(DataStore.INSTANCE.snapshot().claimIdByChunk().containsKey(
-            pers.yufiria.landguard.data.ChunkLoc.of(world, 0, 0)));
+            ChunkLoc.of(world, 0, 0)));
         // 系统回收不扣额度：used 已按实际持有归零
         assertEquals(0, LandDaoManager.INSTANCE.playerQuotaDao().queryForId(ALICE).getUsedChunks());
     }

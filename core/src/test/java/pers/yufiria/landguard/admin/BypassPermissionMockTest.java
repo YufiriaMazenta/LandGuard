@@ -3,6 +3,7 @@ package pers.yufiria.landguard.admin;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -11,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.world.WorldMock;
+import org.mockito.Mockito;
+import pers.yufiria.landguard.LandGuard;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
@@ -86,11 +89,11 @@ public class BypassPermissionMockTest {
     }
 
     private static void installPluginInstance() throws Exception {
-        pers.yufiria.landguard.LandGuard pluginMock =
-            org.mockito.Mockito.mock(pers.yufiria.landguard.LandGuard.class);
-        org.mockito.Mockito.when(pluginMock.getDescription()).thenReturn(
-            new org.bukkit.plugin.PluginDescriptionFile("LandGuard", "1.0.0.0", "x.LandGuard"));
-        Field instanceField = pers.yufiria.landguard.LandGuard.class.getDeclaredField("INSTANCE");
+        LandGuard pluginMock =
+            Mockito.mock(LandGuard.class);
+        Mockito.when(pluginMock.getDescription()).thenReturn(
+            new PluginDescriptionFile("LandGuard", "1.0.0.0", "x.LandGuard"));
+        Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
         instanceField.setAccessible(true);
         instanceField.set(null, pluginMock);
     }

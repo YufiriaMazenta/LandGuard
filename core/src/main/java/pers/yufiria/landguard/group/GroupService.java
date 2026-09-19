@@ -1,7 +1,9 @@
 package pers.yufiria.landguard.group;
 
+import crypticlib.database.dao.Dao;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.config.ClaimConfigs;
+import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
@@ -15,11 +17,16 @@ import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.owner.Roles;
 import pers.yufiria.landguard.util.ConfigValues;
 
+import java.sql.SQLException;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
@@ -33,6 +40,8 @@ public enum GroupService {
     INSTANCE;
 
     private static final Pattern ROLE_ID_PATTERN = Pattern.compile("[a-z0-9_]{1,32}");
+    /** 组标识符（= groupId）格式：与角色标识保持一致。 */
+    private static final Pattern GROUP_ID_PATTERN = Pattern.compile("[a-z0-9_]{1,32}");
     private static final int MAX_GROUP_NAME_LENGTH = 32;
 
     /** groupId -> 被邀请玩家集合（内存态） */
@@ -40,24 +49,58 @@ public enum GroupService {
 
     // ================= 组生命周期 =================
 
-    public CompletableFuture<GroupOpResult> createGroup(UUID creator, String name) {
-        String normalized = normalizeName(name);
-        if (normalized == null) {
+    /**
+     * 建组：{@code groupId} 是玩家自选的短标识符（唯一、创建后不可改），
+     * {@code name} 是可改可重名的展示名（省略时回退为标识符）。
+     */
+    public CompletableFuture<GroupOpResult> createGroup(UUID creator, String groupId, @Nullable String name) {
+        String wantedId = normalizeGroupId(groupId);
+        if (wantedId == null) {
+            return failed(GroupFailureReason.INVALID_KEY);
+        }
+        String wantedName = normalizeName(name == null || name.isBlank() ? wantedId : name);
+        if (wantedName == null) {
             return failed(GroupFailureReason.INVALID_NAME);
         }
-        String groupId = UUID.randomUUID().toString();
         return mutate(resultRef -> current -> {
-            if (findByName(current, normalized) != null) {
-                resultRef.set(GroupOpResult.failed(GroupFailureReason.NAME_TAKEN));
+            if (current.groups().containsKey(wantedId)) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.KEY_TAKEN));
                 return current;
             }
             long now = System.currentTimeMillis();
             LandDaoManager daos = LandDaoManager.INSTANCE;
-            daos.groupDao().create(new GroupData(groupId, normalized, creator, now, 0D));
-            daos.groupMemberDao().create(new GroupMemberData(groupId, creator, Roles.OWNER));
+            daos.groupDao().create(new GroupData(wantedId, wantedName, creator, now, 0D));
+            daos.groupMemberDao().create(new GroupMemberData(wantedId, creator, Roles.OWNER));
             DataSnapshot next = DataStore.rebuildSnapshot();
-            notifyChanged(groupId);
-            resultRef.set(GroupOpResult.ok(groupId));
+            notifyChanged(wantedId);
+            resultRef.set(GroupOpResult.ok(wantedId));
+            return next;
+        });
+    }
+
+    /**
+     * 修改用户组的展示名：仅领袖可操作。展示名可与其他组重名，标识符（groupId）不可改。
+     */
+    public CompletableFuture<GroupOpResult> renameGroup(UUID actor, String groupId, String newName) {
+        String wantedName = normalizeName(newName);
+        if (wantedName == null) {
+            return failed(GroupFailureReason.INVALID_NAME);
+        }
+        return withGroup(actor, groupId, resultRef -> (current, group) -> {
+            if (!isLeader(current, group, actor)) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_LEADER));
+                return current;
+            }
+            GroupData stored = LandDaoManager.INSTANCE.groupDao().queryForId(group.getGroupId());
+            if (stored == null) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.GROUP_NOT_FOUND));
+                return current;
+            }
+            stored.setName(wantedName);
+            LandDaoManager.INSTANCE.groupDao().update(stored);
+            DataSnapshot next = DataStore.rebuildSnapshot();
+            notifyChanged(group.getGroupId());
+            resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
         });
     }
@@ -111,13 +154,13 @@ public enum GroupService {
         return consumeInvite(player, groupName, false);
     }
 
-    private CompletableFuture<GroupOpResult> consumeInvite(UUID player, String groupName, boolean accept) {
-        String wanted = normalizeName(groupName);
+    private CompletableFuture<GroupOpResult> consumeInvite(UUID player, String groupId, boolean accept) {
+        String wanted = normalizeGroupId(groupId);
         if (wanted == null) {
-            return failed(GroupFailureReason.INVALID_NAME);
+            return failed(GroupFailureReason.INVALID_KEY);
         }
         return mutate(resultRef -> current -> {
-            GroupData group = findByName(current, wanted);
+            GroupData group = findById(current, wanted);
             if (group == null) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.GROUP_NOT_FOUND));
                 return current;
@@ -293,7 +336,7 @@ public enum GroupService {
                 return current;
             }
             String claimId = current.claimIdByChunk()
-                .get(pers.yufiria.landguard.data.ChunkLoc.of(worldUuid, chunkX, chunkZ));
+                .get(ChunkLoc.of(worldUuid, chunkX, chunkZ));
             ClaimData claim = claimId == null ? null : current.claimsById().get(claimId);
             if (claim == null) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.CLAIM_NOT_FOUND));
@@ -352,15 +395,30 @@ public enum GroupService {
             || Roles.OWNER.equals(roleOf(snapshot, group.getGroupId(), player));
     }
 
-    private static @Nullable GroupData findByName(DataSnapshot snapshot, String name) {
-        for (GroupData group : snapshot.groups().values()) {
-            if (group.getName().equalsIgnoreCase(name)) {
-                return group;
-            }
+    /**
+     * 按标识符（= groupId，忽略大小写）查找用户组。
+     * {@link DataSnapshot#groups()} 本就是以 groupId 为 key，故为 O(1) 取用；供命令参数解析与补全复用。
+     */
+    public static @Nullable GroupData findById(DataSnapshot snapshot, String groupId) {
+        if (groupId == null) {
+            return null;
         }
-        return null;
+        return snapshot.groups().get(groupId.toLowerCase(Locale.ROOT));
     }
 
+    /** 该玩家当前有待处理邀请的用户组标识符；供补全与提示使用。 */
+    public Set<String> pendingInviteGroupIds(UUID player) {
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        Set<String> ids = new LinkedHashSet<>();
+        pendingInvites.forEach((groupId, invited) -> {
+            if (invited.contains(player) && snapshot.groups().containsKey(groupId)) {
+                ids.add(groupId);
+            }
+        });
+        return ids;
+    }
+
+    /** 展示名：trim 后非空且不超过长度上限；允许与其他用户组重名。 */
     private static @Nullable String normalizeName(@Nullable String name) {
         if (name == null || name.isBlank()) {
             return null;
@@ -372,13 +430,22 @@ public enum GroupService {
         return trimmed;
     }
 
-    private void deleteMember(String groupId, UUID player) throws java.sql.SQLException {
+    /** 标识符：1-32 位小写字母、数字、下划线；统一转小写后返回，非法返回 null。 */
+    private static @Nullable String normalizeGroupId(@Nullable String groupId) {
+        if (groupId == null) {
+            return null;
+        }
+        String normalized = groupId.trim().toLowerCase(Locale.ROOT);
+        return GROUP_ID_PATTERN.matcher(normalized).matches() ? normalized : null;
+    }
+
+    private void deleteMember(String groupId, UUID player) throws SQLException {
         var delete = LandDaoManager.INSTANCE.groupMemberDao().deleteBuilder();
         delete.where(w -> w.equals("group_id", groupId).and().equals("member_uuid", player));
         delete.delete();
     }
 
-    private void deleteByGroup(crypticlib.database.dao.Dao<?> dao, String groupId) throws java.sql.SQLException {
+    private void deleteByGroup(Dao<?> dao, String groupId) throws SQLException {
         var delete = dao.deleteBuilder();
         delete.where(w -> w.equals("group_id", groupId));
         delete.delete();
@@ -386,7 +453,7 @@ public enum GroupService {
 
     @SuppressWarnings("unchecked")
     private void upsertMemberRole(LandDaoManager daos, String groupId, UUID player, String roleId)
-        throws java.sql.SQLException {
+        throws SQLException {
         var dao = daos.groupMemberDao();
         var query = dao.queryBuilder();
         query.where(w -> w.equals("group_id", groupId).and().equals("member_uuid", player));
@@ -409,15 +476,15 @@ public enum GroupService {
     }
 
     private CompletableFuture<GroupOpResult> withGroup(
-        UUID actor, String groupName,
-        java.util.function.Function<java.util.concurrent.atomic.AtomicReference<GroupOpResult>, GroupMutation> factory
+        UUID actor, String groupId,
+        Function<AtomicReference<GroupOpResult>, GroupMutation> factory
     ) {
-        String wanted = normalizeName(groupName);
+        String wanted = normalizeGroupId(groupId);
         if (wanted == null) {
-            return failed(GroupFailureReason.INVALID_NAME);
+            return failed(GroupFailureReason.INVALID_KEY);
         }
         return mutate(resultRef -> current -> {
-            GroupData group = findByName(current, wanted);
+            GroupData group = findById(current, wanted);
             if (group == null) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.GROUP_NOT_FOUND));
                 return current;
@@ -433,10 +500,10 @@ public enum GroupService {
     }
 
     private CompletableFuture<GroupOpResult> mutate(
-        java.util.function.Function<java.util.concurrent.atomic.AtomicReference<GroupOpResult>, MutationBody> factory
+        Function<AtomicReference<GroupOpResult>, MutationBody> factory
     ) {
-        java.util.concurrent.atomic.AtomicReference<GroupOpResult> resultRef =
-            new java.util.concurrent.atomic.AtomicReference<>(GroupOpResult.failed(GroupFailureReason.GROUP_NOT_FOUND));
+        AtomicReference<GroupOpResult> resultRef =
+            new AtomicReference<>(GroupOpResult.failed(GroupFailureReason.GROUP_NOT_FOUND));
         return DataStore.INSTANCE.mutate(current -> factory.apply(resultRef).mutate(current))
             .thenApply(snapshot -> resultRef.get());
     }

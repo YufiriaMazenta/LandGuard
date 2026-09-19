@@ -11,6 +11,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -154,8 +155,8 @@ public class ClaimOwnerRegistrySpiTest {
         }
 
         @Override
-        public @NotNull java.util.Set<UUID> members() {
-            return java.util.Set.copyOf(roles.keySet());
+        public @NotNull Set<UUID> members() {
+            return Set.copyOf(roles.keySet());
         }
 
         @Override

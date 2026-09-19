@@ -1,8 +1,11 @@
 package pers.yufiria.landguard.protection;
 
+import org.bukkit.ExplosionResult;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBurnEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
@@ -20,6 +23,8 @@ import org.mockbukkit.mockbukkit.world.WorldMock;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.protection.listener.BlockProtectionListener;
+import pers.yufiria.landguard.protection.listener.EntityProtectionListener;
 import pers.yufiria.landguard.protection.listener.NaturalProtectionListener;
 
 import java.lang.reflect.Field;
@@ -58,12 +63,12 @@ public class NaturalListenerMockTest {
         plugin = MockBukkit.createMockPlugin("landguard-test");
         PluginManager pm = MockBukkit.getMock().getPluginManager();
         register(pm, NaturalProtectionListener.INSTANCE);
-        register(pm, pers.yufiria.landguard.protection.listener.BlockProtectionListener.INSTANCE);
-        register(pm, pers.yufiria.landguard.protection.listener.EntityProtectionListener.INSTANCE);
+        register(pm, BlockProtectionListener.INSTANCE);
+        register(pm, EntityProtectionListener.INSTANCE);
         publishSnapshot(snapshotWithClaims());
     }
 
-    private void register(PluginManager pm, org.bukkit.event.Listener listener) {
+    private void register(PluginManager pm, Listener listener) {
         pm.registerEvents(listener, plugin);
         registeredListeners.add(listener);
     }
@@ -71,7 +76,7 @@ public class NaturalListenerMockTest {
     @AfterEach
     void tearDown() throws Exception {
         for (Object listener : registeredListeners) {
-            org.bukkit.event.HandlerList.unregisterAll((org.bukkit.event.Listener) listener);
+            HandlerList.unregisterAll((Listener) listener);
         }
         registeredListeners.clear();
         publishSnapshot(DataSnapshot.empty());
@@ -147,7 +152,7 @@ public class NaturalListenerMockTest {
         wildBlock.setType(Material.DIRT);
         List<Block> blocks = new ArrayList<>(List.of(claimBlock, wildBlock));
         EntityExplodeEvent event = new EntityExplodeEvent(
-            null, claimBlock.getLocation(), blocks, 0F, org.bukkit.ExplosionResult.DESTROY);
+            null, claimBlock.getLocation(), blocks, 0F, ExplosionResult.DESTROY);
         MockBukkit.getMock().getPluginManager().callEvent(event);
         // 领地方块从影响列表剔除（零变化），野外方块保留
         assertEquals(List.of(wildBlock), event.blockList());
