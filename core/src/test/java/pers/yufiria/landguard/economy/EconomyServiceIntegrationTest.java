@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
@@ -17,12 +18,14 @@ import pers.yufiria.landguard.group.GroupOpResult;
 import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
+import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.owner.OwnerType;
 import pers.yufiria.landguard.owner.builtin.PlayerClaimOwnerProvider;
 import pers.yufiria.landguard.owner.builtin.group.GroupClaimOwnerProvider;
 import pers.yufiria.landguard.protection.BuiltinFlags;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -112,12 +115,12 @@ public class EconomyServiceIntegrationTest {
     void cannotSellQuotaInUse() throws Exception {
         // 初始额度 64 + 购买 10；认领 70 块占用 70；可卖额度只剩 64+10-70=4
         EconomyService.INSTANCE.buyChunks(ALICE, 10).join();
-        List<ChunkLoc> seventy = new java.util.ArrayList<>();
+        List<ChunkLoc> seventy = new ArrayList<>();
         for (int i = 0; i < 70; i++) {
             seventy.add(ChunkLoc.of(world, 100 + i, 100));
         }
-        var claimResult = pers.yufiria.landguard.claim.ClaimService.INSTANCE.claim(
-            pers.yufiria.landguard.owner.OwnerRef.of(BuiltinOwnerTypes.PLAYER, ALICE.toString()),
+        var claimResult = ClaimService.INSTANCE.claim(
+            OwnerRef.of(BuiltinOwnerTypes.PLAYER, ALICE.toString()),
             world, seventy, "Big", false).join();
         assertTrue(claimResult.success(), claimResult.failureReason() == null ? "" : claimResult.failureReason().name());
 
@@ -171,7 +174,7 @@ public class EconomyServiceIntegrationTest {
 
     @Test
     void groupClaimUsesGroupBank() throws Exception {
-        GroupOpResult created = GroupService.INSTANCE.createGroup(ALICE, "Guild").join();
+        GroupOpResult created = GroupService.INSTANCE.createGroup(ALICE, "Guild", "Guild").join();
         assertTrue(created.success());
         String groupId = created.groupId();
         String claimId = UUID.randomUUID().toString();

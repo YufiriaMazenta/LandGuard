@@ -5,11 +5,14 @@ import crypticlib.database.connection.ConnectionSource;
 import crypticlib.database.connection.JdbcConnectionSource;
 import crypticlib.scheduler.SpigotScheduler;
 import crypticlib.ui.display.Icon;
+import crypticlib.ui.menu.Menu;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.permissions.Permission;
 import org.bukkit.permissions.PermissionDefault;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginDescriptionFile;
+import org.jetbrains.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +21,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 import org.mockbukkit.mockbukkit.world.WorldMock;
+import org.mockito.Mockito;
+import pers.yufiria.landguard.LandGuard;
 import pers.yufiria.landguard.config.EconomyConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
@@ -40,6 +45,7 @@ import pers.yufiria.landguard.protection.BuiltinFlags;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -128,11 +134,11 @@ public class ClaimMenuMockTest {
     }
 
     private static void installPluginInstance() throws Exception {
-        pers.yufiria.landguard.LandGuard pluginMock =
-            org.mockito.Mockito.mock(pers.yufiria.landguard.LandGuard.class);
-        org.mockito.Mockito.when(pluginMock.getDescription()).thenReturn(
-            new org.bukkit.plugin.PluginDescriptionFile("LandGuard", "1.0.0.0", "x.LandGuard"));
-        Field instanceField = pers.yufiria.landguard.LandGuard.class.getDeclaredField("INSTANCE");
+        LandGuard pluginMock =
+            Mockito.mock(LandGuard.class);
+        Mockito.when(pluginMock.getDescription()).thenReturn(
+            new PluginDescriptionFile("LandGuard", "1.0.0.0", "x.LandGuard"));
+        Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
         instanceField.setAccessible(true);
         instanceField.set(null, pluginMock);
     }
@@ -166,10 +172,10 @@ public class ClaimMenuMockTest {
 
     /** 让测试同时接受 crypticlib Menu 子类而不直接耦合类型名的小适配。 */
     private interface MenuLike {
-        @org.jetbrains.annotations.Nullable Icon iconAt(int slot);
+        @Nullable Icon iconAt(int slot);
     }
 
-    private static MenuLike wrap(crypticlib.ui.menu.Menu menu) {
+    private static MenuLike wrap(Menu menu) {
         menu.getInventory();
         return slot -> menu.getIcon(slot).orElse(null);
     }
@@ -265,7 +271,7 @@ public class ClaimMenuMockTest {
         assertEquals(Material.BARRIER, personal.iconAt(22).display().getType(),
             "个人领地成员页为空提示");
 
-        GroupOpResult created = GroupService.INSTANCE.createGroup(ALICE, "Guild").join();
+        GroupOpResult created = GroupService.INSTANCE.createGroup(ALICE, "Guild", "Guild").join();
         assertTrue(created.success());
         GroupOpResult given = GroupService.INSTANCE.giveClaim(
             ALICE, "Guild", world.getUID(), 0, 0).join();
@@ -364,7 +370,7 @@ public class ClaimMenuMockTest {
 
         @Override
         public String format(double amount) {
-            return String.format(java.util.Locale.ROOT, "%.2f", amount);
+            return String.format(Locale.ROOT, "%.2f", amount);
         }
     }
 }

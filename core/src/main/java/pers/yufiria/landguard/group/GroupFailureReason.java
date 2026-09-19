@@ -5,7 +5,11 @@ package pers.yufiria.landguard.group;
  */
 public enum GroupFailureReason {
 
-    NAME_TAKEN,
+    /** 标识符已被占用 */
+    KEY_TAKEN,
+    /** 标识符格式非法（1-32 位小写字母、数字、下划线） */
+    INVALID_KEY,
+    /** 展示名非法（空或超过长度上限） */
     INVALID_NAME,
     GROUP_NOT_FOUND,
     NOT_LEADER,

@@ -9,9 +9,6 @@ import org.bukkit.entity.Player;
  */
 public final class Schedulers {
 
-    private Schedulers() {
-    }
-
     public static void onPlayer(Player player, Runnable task) {
         CrypticLibBukkit.scheduler().runOnEntity(player, task, null);
     }

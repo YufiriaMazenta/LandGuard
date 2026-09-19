@@ -30,6 +30,7 @@ import pers.yufiria.landguard.owner.Roles;
 import pers.yufiria.landguard.owner.builtin.PlayerClaimOwnerProvider;
 import pers.yufiria.landguard.owner.builtin.group.GroupClaimOwnerProvider;
 import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner;
+import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwnerProvider;
 import pers.yufiria.landguard.protection.BuiltinFlags;
 import pers.yufiria.landguard.upkeep.UpkeepCause;
 import pers.yufiria.landguard.upkeep.UpkeepCycleResult;
@@ -75,7 +76,7 @@ public class OrphanAdminIntegrationTest {
         DataStore.INSTANCE.reloadFrom(connection).join();
         ClaimOwnerRegistry.INSTANCE.register(PlayerClaimOwnerProvider.INSTANCE);
         ClaimOwnerRegistry.INSTANCE.register(GroupClaimOwnerProvider.INSTANCE);
-        ClaimOwnerRegistry.INSTANCE.register(pers.yufiria.landguard.owner.builtin.server.ServerClaimOwnerProvider.INSTANCE);
+        ClaimOwnerRegistry.INSTANCE.register(ServerClaimOwnerProvider.INSTANCE);
         world = UUID.randomUUID();
 
         set(UpkeepConfigs.UPKEEP_ENABLED, false);
@@ -120,7 +121,7 @@ public class OrphanAdminIntegrationTest {
     }
 
     private String createGroup(String name) {
-        GroupOpResult result = GroupService.INSTANCE.createGroup(ALICE, name).join();
+        GroupOpResult result = GroupService.INSTANCE.createGroup(ALICE, name, name).join();
         assertTrue(result.success());
         return result.groupId();
     }
@@ -134,7 +135,8 @@ public class OrphanAdminIntegrationTest {
     }
 
     private String nameOr(String s) {
-        return "claim-" + s.substring(0, 8);
+        // 组标识符由玩家自选、长度不定，取前 8 位时需防越界
+        return "claim-" + s.substring(0, Math.min(8, s.length()));
     }
 
     private ClaimData fresh(String claimId) throws Exception {

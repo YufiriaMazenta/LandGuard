@@ -97,7 +97,7 @@ public class GroupLifecycleIntegrationTest {
     }
 
     private String createGuild() {
-        GroupOpResult created = GroupService.INSTANCE.createGroup(ALICE, "Guild").join();
+        GroupOpResult created = GroupService.INSTANCE.createGroup(ALICE, "Guild", "Guild").join();
         assertTrue(created.success());
         return created.groupId();
     }
