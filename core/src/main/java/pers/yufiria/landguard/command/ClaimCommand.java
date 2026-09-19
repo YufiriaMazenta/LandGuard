@@ -1,6 +1,6 @@
 package pers.yufiria.landguard.command;
 
-import crypticlib.CrypticLibBukkit;
+import crypticlib.CommonPlayer;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -18,7 +18,9 @@ import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.util.CommandUtils;
+import pers.yufiria.landguard.util.ConfigValues;
 import pers.yufiria.landguard.util.LangUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -36,10 +38,12 @@ public final class ClaimCommand extends CommandNode {
         if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
             return;
         }
-        Player player = (Player) CommandUtils.invoker2Sender(invoker);
+        CommonPlayer player = invoker.asPlayer();
+        // 仅世界/坐标与实体区域调度需要 Bukkit 玩家，其余一律走 crypticlib 对象
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
 
         if (!args.isEmpty() && args.get(0).equalsIgnoreCase("auto")) {
-            boolean enabled = AutoClaimManager.INSTANCE.toggle(player.getUniqueId());
+            boolean enabled = AutoClaimManager.INSTANCE.toggle(player.uniqueId());
             LangUtils.sendLang(player, enabled ? Languages.COMMAND_CLAIM_AUTO_ON : Languages.COMMAND_CLAIM_AUTO_OFF);
             return;
         }
@@ -64,23 +68,23 @@ public final class ClaimCommand extends CommandNode {
                 LangUtils.sendLang(player, Languages.COMMAND_CLAIM_RADIUS_INVALID);
                 return;
             }
-            int max = pers.yufiria.landguard.util.ConfigValues.get(ClaimConfigs.MAX_RADIUS);
+            int max = ConfigValues.get(ClaimConfigs.MAX_RADIUS);
             if (radius > max) {
-                LangUtils.sendLang(player, Languages.COMMAND_CLAIM_RADIUS_TOO_LARGE, Map.of("max", String.valueOf(max)));
+                LangUtils.sendLang(player, Languages.COMMAND_CLAIM_RADIUS_TOO_LARGE, Map.of("<max>", String.valueOf(max)));
                 return;
             }
         }
 
         List<ChunkLoc> targets = ClaimEngine.radiusTargets(
-            player.getWorld().getUID(), player.getLocation().getBlockX() >> 4, player.getLocation().getBlockZ() >> 4, radius);
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
-        ClaimService.INSTANCE.claim(owner, player.getWorld().getUID(), targets, player.getName(), false)
-            .whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                if (!player.isOnline() || throwable != null || result == null) {
+            bukkitPlayer.getWorld().getUID(), bukkitPlayer.getLocation().getBlockX() >> 4, bukkitPlayer.getLocation().getBlockZ() >> 4, radius);
+        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
+        ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, player.name(), false)
+            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
                 if (result.success()) {
-                    ClaimBoundaryVisualizer.show(player, targets);
+                    ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
                     ClaimMessages.claimSuccess(player, result);
                 } else {
                     ClaimMessages.failure(player, result.failureReason());
@@ -91,6 +95,11 @@ public final class ClaimCommand extends CommandNode {
     @Override
     public void onNoPerm(@NotNull Invoker invoker, @NotNull List<String> args) {
         LangUtils.sendLang(invoker, Languages.COMMAND_NO_PERM);
+    }
+
+    @Override
+    public List<String> tabComplete(@NotNull Invoker invoker, @NotNull List<String> args) {
+        return args.size() == 1 ? List.of("auto", "radius") : List.of();
     }
 
 }
