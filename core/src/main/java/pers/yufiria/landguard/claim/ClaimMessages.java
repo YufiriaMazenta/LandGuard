@@ -1,6 +1,6 @@
 package pers.yufiria.landguard.claim;
 
-import org.bukkit.command.CommandSender;
+import crypticlib.Invoker;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -14,32 +14,35 @@ public final class ClaimMessages {
     private ClaimMessages() {
     }
 
-    public static void claimSuccess(CommandSender sender, ClaimOpResult result) {
-        LangUtils.sendLang(sender, Languages.COMMAND_CLAIM_SUCCESS, Map.of(
-            "count", String.valueOf(result.affectedChunks()),
-            "available", formatAvailable(result.availableChunks())
+    public static void claimSuccess(Invoker player, ClaimOpResult result) {
+        LangUtils.sendLang(player, Languages.COMMAND_CLAIM_SUCCESS, Map.of(
+            "<count>", String.valueOf(result.affectedChunks()),
+            "<available>", formatAvailable(result.availableChunks())
         ));
     }
 
-    public static void unclaimSuccess(CommandSender sender, ClaimOpResult result) {
-        LangUtils.sendLang(sender, Languages.COMMAND_UNCLAIM_SUCCESS, Map.of(
-            "count", String.valueOf(result.affectedChunks()),
-            "refunded", String.valueOf(result.refundedChunks()),
-            "available", formatAvailable(result.availableChunks())
+    public static void unclaimSuccess(Invoker player, ClaimOpResult result) {
+        LangUtils.sendLang(player, Languages.COMMAND_UNCLAIM_SUCCESS, Map.of(
+            "<count>", String.valueOf(result.affectedChunks()),
+            "<refunded>", String.valueOf(result.refundedChunks()),
+            "<available>", formatAvailable(result.availableChunks())
         ));
     }
 
-    public static void failure(CommandSender sender, ClaimFailureReason reason) {
+    public static void failure(Invoker invoker, ClaimFailureReason reason) {
         if (reason == null) {
             return;
         }
-        LangUtils.sendLang(sender, switch (reason) {
+        LangUtils.sendLang(invoker, switch (reason) {
             case OVERLAP -> Languages.COMMAND_FAIL_OVERLAP;
             case NOT_ADJACENT -> Languages.COMMAND_FAIL_NOT_ADJACENT;
             case QUOTA_EXCEEDED -> Languages.COMMAND_FAIL_QUOTA_EXCEEDED;
             case NOT_CLAIMED -> Languages.COMMAND_FAIL_NOT_CLAIMED;
             case NOT_OWNER -> Languages.COMMAND_FAIL_NOT_OWNER;
             case INVALID_TARGETS -> Languages.COMMAND_FAIL_INVALID_TARGETS;
+            case INVALID_NAME -> Languages.COMMAND_FAIL_INVALID_NAME;
+            case ALREADY_OWNED -> Languages.COMMAND_FAIL_ALREADY_OWNED;
+            case TARGET_HAS_CLAIM -> Languages.COMMAND_FAIL_TARGET_HAS_CLAIM;
         });
     }
 

@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.upkeep;
 
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import crypticlib.CommonPlayer;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -9,9 +8,9 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * 回收周期结果的 Bukkit 通知分发（可在全局区域线程或玩家实体线程调用）：
+ * 回收周期结果的通知分发（可在全局区域线程或玩家实体线程调用）：
  * 在线所有者成员收到对应语言条目，控制台始终记录一份；离线玩家不补发。
- * Folia 上 Player#sendMessage 是线程安全的跨区域操作，故无需逐玩家调度。
+ * Folia 上消息发送是线程安全的跨区域操作，故无需逐玩家调度。
  */
 public final class UpkeepNotifications {
 
@@ -24,8 +23,8 @@ public final class UpkeepNotifications {
         }
         for (UpkeepNotice notice : result.notices()) {
             Map<String, String> params = Map.of(
-                "name", notice.claimName() == null ? "" : notice.claimName(),
-                "chunks", String.valueOf(notice.chunks())
+                "<name>", notice.claimName() == null ? "" : notice.claimName(),
+                "<chunks>", String.valueOf(notice.chunks())
             );
             var entry = switch (notice.cause()) {
                 case UPKEEP_DEBT -> notice.release()
@@ -41,10 +40,8 @@ public final class UpkeepNotifications {
             // 控制台留底（含无人在线时的唯一可见渠道）
             LangUtils.info(entry, params);
             for (UUID uuid : notice.recipients()) {
-                Player player = Bukkit.getPlayer(uuid);
-                if (player != null && player.isOnline()) {
-                    LangUtils.sendLang(player, entry, params);
-                }
+                // fromUuid 只返回在线玩家，离线者自动跳过
+                CommonPlayer.fromUuid(uuid).ifPresent(player -> LangUtils.sendLang(player, entry, params));
             }
         }
     }

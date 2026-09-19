@@ -1,5 +1,6 @@
 package pers.yufiria.landguard.ui;
 
+import crypticlib.BukkitPlayer;
 import crypticlib.CrypticLibBukkit;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.MenuDisplay;
@@ -15,6 +16,8 @@ import pers.yufiria.landguard.claim.ClaimBoundaryVisualizer;
 import pers.yufiria.landguard.claim.ClaimEngine;
 import pers.yufiria.landguard.claim.ClaimMessages;
 import pers.yufiria.landguard.claim.ClaimService;
+import pers.yufiria.landguard.util.CommandUtils;
+import pers.yufiria.landguard.util.Schedulers;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
@@ -30,6 +33,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * 领地列表（/land 入口）：列出玩家可见的全部领地（个人所有 + 作为成员的组领地），
@@ -61,7 +66,7 @@ public class ClaimListMenu extends Menu {
     }
 
     private MenuDisplay buildDisplay() {
-        Map<Character, java.util.function.Supplier<Icon>> icons = new LinkedHashMap<>();
+        Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
         icons.put('p', () -> MenuSupport.arrow(player().orElse(null), false, page > 0,
             () -> changePage(page - 1)));
@@ -74,14 +79,14 @@ public class ClaimListMenu extends Menu {
     private String title() {
         Player player = player().orElse(null);
         return MenuSupport.text(player, Languages.MENU_LIST_TITLE, Map.of(
-            "page", String.valueOf(page + 1),
-            "max_page", String.valueOf(maxPage() + 1)
+            "<page>", String.valueOf(page + 1),
+            "<max_page>", String.valueOf(maxPage() + 1)
         ));
     }
 
     private List<String> visibleClaimIds() {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        java.util.UUID viewer = playerId;
+        UUID viewer = playerId;
         List<String> result = new ArrayList<>();
         for (ClaimData claim : snapshot.claimsById().values()) {
             if (claim.isAdmin() || BuiltinOwnerTypes.SERVER.equals(claim.getOwnerType())) {
@@ -125,15 +130,15 @@ public class ClaimListMenu extends Menu {
         );
         OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
         ClaimService.INSTANCE.claim(owner, player.getWorld().getUID(), targets, player.getName(), false)
-            .whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
+            .whenComplete((result, throwable) -> Schedulers.onPlayer(player, () -> {
                 if (!player.isOnline() || throwable != null || result == null) {
                     return;
                 }
                 if (result.success()) {
                     ClaimBoundaryVisualizer.show(player, targets);
-                    ClaimMessages.claimSuccess(player, result);
+                    ClaimMessages.claimSuccess(CommandUtils.commonPlayer(player), result);
                 } else {
-                    ClaimMessages.failure(player, result.failureReason());
+                    ClaimMessages.failure(CommandUtils.commonPlayer(player), result.failureReason());
                 }
                 refresh();
             }));
@@ -178,13 +183,13 @@ public class ClaimListMenu extends Menu {
             : PlainTextComponentSerializer.plainText().serialize(owner.displayName());
         String name = claim.getName() == null ? claimId : claim.getName();
         List<String> lore = List.of(
-            MenuSupport.text(player, Languages.MENU_LIST_ENTRY_OWNER, Map.of("owner", ownerName)),
+            MenuSupport.text(player, Languages.MENU_LIST_ENTRY_OWNER, Map.of("<owner>", ownerName)),
             MenuSupport.text(player, Languages.MENU_LIST_ENTRY_WORLD, Map.of(
-                "world", world == null ? claim.getWorldUuid().toString().substring(0, 8) : world.getName())),
-            MenuSupport.text(player, Languages.MENU_LIST_ENTRY_CHUNKS, Map.of("chunks", String.valueOf(chunks)))
+                "<world>", world == null ? claim.getWorldUuid().toString().substring(0, 8) : world.getName())),
+            MenuSupport.text(player, Languages.MENU_LIST_ENTRY_CHUNKS, Map.of("<chunks>", String.valueOf(chunks)))
         );
         Icon icon = MenuSupport.icon(Material.PAPER,
-            MenuSupport.text(player, Languages.MENU_LIST_ENTRY_NAME, Map.of("name", name)), lore);
+            MenuSupport.text(player, Languages.MENU_LIST_ENTRY_NAME, Map.of("<name>", name)), lore);
         icon.setClickAction(event -> {
             Player clicker = player().orElse(null);
             if (clicker == null) {

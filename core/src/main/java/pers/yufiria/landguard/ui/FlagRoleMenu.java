@@ -16,6 +16,7 @@ import pers.yufiria.landguard.owner.Roles;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * flag 设置入口：先选择身份维度（owner/manager/member/visitor 行为矩阵，或自然环境开关）。
@@ -43,7 +44,7 @@ public class FlagRoleMenu extends Menu {
 
     private MenuDisplay buildDisplay() {
         Player player = player().orElse(null);
-        Map<Character, java.util.function.Supplier<Icon>> icons = new LinkedHashMap<>();
+        Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
         icons.put('o', () -> roleIcon(Material.GOLDEN_HELMET,
             Languages.MENU_ROLE_OWNER_NAME, Languages.MENU_ROLE_OWNER_LORE, Roles.OWNER, false));
@@ -79,7 +80,7 @@ public class FlagRoleMenu extends Menu {
         Player player = player().orElse(null);
         ClaimData claim = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
         String name = claim == null || claim.getName() == null ? claimId : claim.getName();
-        return MenuSupport.text(player, Languages.MENU_ROLE_TITLE, Map.of("name", name));
+        return MenuSupport.text(player, Languages.MENU_ROLE_TITLE, Map.of("<name>", name));
     }
 
     @Override

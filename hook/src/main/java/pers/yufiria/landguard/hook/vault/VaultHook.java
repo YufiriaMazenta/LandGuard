@@ -7,10 +7,12 @@ import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.economy.EconomyProvider;
 import pers.yufiria.landguard.economy.EconomyService;
+import pers.yufiria.landguard.util.LangUtils;
 
-import java.util.logging.Logger;
+import java.util.Map;
 
 /**
  * Vault 经济接入生命周期任务。
@@ -38,7 +40,7 @@ public enum VaultHook implements LifecycleTask {
     @Override
     public void onLifecycle(CrypticLibPlugin plugin, LifecyclePhase phase) {
         switch (phase) {
-            case ACTIVE, RELOAD -> tryHook(Logger.getLogger("LandGuard"));
+            case ACTIVE, RELOAD -> tryHook();
             case DISABLE -> {
                 hooked = false;
                 EconomyService.INSTANCE.unhook();
@@ -48,16 +50,16 @@ public enum VaultHook implements LifecycleTask {
         }
     }
 
-    private void tryHook(Logger logger) {
+    private void tryHook() {
         if (Bukkit.getPluginManager().getPlugin(VAULT_PLUGIN) == null) {
-            logger.info("[LandGuard] 未检测到 Vault，经济功能（买卖额度/领地银行）自动禁用，其余功能不受影响");
+            LangUtils.info(Languages.HOOK_VAULT_MISSING);
             return;
         }
         try {
             Class<?> economyClass = Class.forName(ECONOMY_CLASS);
             RegisteredServiceProvider<?> registration = Bukkit.getServicesManager().getRegistration(economyClass);
             if (registration == null) {
-                logger.info("[LandGuard] 已安装 Vault 但没有任何经济服务提供者，经济功能保持禁用");
+                LangUtils.info(Languages.HOOK_VAULT_NO_PROVIDER);
                 return;
             }
             Object economy = registration.getProvider();
@@ -67,11 +69,12 @@ public enum VaultHook implements LifecycleTask {
                 .newInstance(economy);
             EconomyService.INSTANCE.hook(adapter);
             hooked = true;
-            logger.info("[LandGuard] 已接入 Vault 经济：" + adapter.name());
+            LangUtils.info(Languages.HOOK_VAULT_HOOKED, Map.of("<name>", adapter.name()));
         } catch (ClassNotFoundException vaultMissing) {
-            logger.info("[LandGuard] Vault API 不存在，经济功能保持禁用");
+            LangUtils.info(Languages.HOOK_VAULT_API_MISSING);
         } catch (ReflectiveOperationException e) {
-            logger.warning("[LandGuard] Vault 经济适配器初始化失败，经济功能保持禁用: " + e.getMessage());
+            LangUtils.info(Languages.HOOK_VAULT_ADAPTER_FAILED,
+                Map.of("<reason>", String.valueOf(e.getMessage())));
         }
     }
 

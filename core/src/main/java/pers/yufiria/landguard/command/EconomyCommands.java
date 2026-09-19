@@ -1,6 +1,6 @@
 package pers.yufiria.landguard.command;
 
-import crypticlib.CrypticLibBukkit;
+import crypticlib.CommonPlayer;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -10,10 +10,10 @@ import org.jetbrains.annotations.NotNull;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.economy.EconomyFailureReason;
-import pers.yufiria.landguard.economy.EconomyOpResult;
 import pers.yufiria.landguard.economy.EconomyService;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Locale;
@@ -33,7 +33,7 @@ public final class EconomyCommands {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
-    public static void sendFail(Player player, EconomyFailureReason reason) {
+    public static void sendFail(Invoker player, EconomyFailureReason reason) {
         var entry = switch (reason) {
             case UNAVAILABLE -> Languages.COMMAND_ECONOMY_UNAVAILABLE;
             case INVALID_AMOUNT -> Languages.COMMAND_ECONOMY_INVALID_AMOUNT;
@@ -62,7 +62,8 @@ public final class EconomyCommands {
             if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
                 return;
             }
-            Player player = (Player) CommandUtils.invoker2Sender(invoker);
+            CommonPlayer player = invoker.asPlayer();
+            Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
             if (!EconomyService.INSTANCE.available()) {
                 LangUtils.sendLang(player, Languages.COMMAND_ECONOMY_UNAVAILABLE);
                 return;
@@ -71,16 +72,16 @@ public final class EconomyCommands {
             if (chunks == null) {
                 return;
             }
-            EconomyService.INSTANCE.buyChunks(player.getUniqueId(), chunks)
-                .whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                    if (!player.isOnline() || throwable != null || result == null) {
+            EconomyService.INSTANCE.buyChunks(player.uniqueId(), chunks)
+                .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                    if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                         return;
                     }
                     if (result.success()) {
                         LangUtils.sendLang(player, Languages.COMMAND_BUY_SUCCESS, Map.of(
-                            "chunks", String.valueOf(chunks),
-                            "cost", money(result.amount()),
-                            "balance", money(result.accountBalance())));
+                            "<chunks>", String.valueOf(chunks),
+                            "<cost>", money(result.amount()),
+                            "<balance>", money(result.accountBalance())));
                     } else {
                         sendFail(player, result.failureReason());
                     }
@@ -108,7 +109,8 @@ public final class EconomyCommands {
             if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
                 return;
             }
-            Player player = (Player) CommandUtils.invoker2Sender(invoker);
+            CommonPlayer player = invoker.asPlayer();
+            Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
             if (!EconomyService.INSTANCE.available()) {
                 LangUtils.sendLang(player, Languages.COMMAND_ECONOMY_UNAVAILABLE);
                 return;
@@ -117,16 +119,16 @@ public final class EconomyCommands {
             if (chunks == null) {
                 return;
             }
-            EconomyService.INSTANCE.sellChunks(player.getUniqueId(), chunks)
-                .whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                    if (!player.isOnline() || throwable != null || result == null) {
+            EconomyService.INSTANCE.sellChunks(player.uniqueId(), chunks)
+                .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                    if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                         return;
                     }
                     if (result.success()) {
                         LangUtils.sendLang(player, Languages.COMMAND_SELL_SUCCESS, Map.of(
-                            "chunks", String.valueOf(chunks),
-                            "refund", money(result.amount()),
-                            "balance", money(result.accountBalance())));
+                            "<chunks>", String.valueOf(chunks),
+                            "<refund>", money(result.amount()),
+                            "<balance>", money(result.accountBalance())));
                     } else {
                         sendFail(player, result.failureReason());
                     }
@@ -154,21 +156,22 @@ public final class EconomyCommands {
             if (!CommandUtils.checkInvokerIsPlayer(invoker)) {
                 return;
             }
-            Player player = (Player) CommandUtils.invoker2Sender(invoker);
+            CommonPlayer player = invoker.asPlayer();
+            Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
             if (!EconomyService.INSTANCE.available()) {
                 LangUtils.sendLang(player, Languages.COMMAND_ECONOMY_UNAVAILABLE);
                 return;
             }
-            UUID world = player.getWorld().getUID();
-            int cx = player.getLocation().getBlockX() >> 4;
-            int cz = player.getLocation().getBlockZ() >> 4;
+            UUID world = bukkitPlayer.getWorld().getUID();
+            int cx = bukkitPlayer.getLocation().getBlockX() >> 4;
+            int cz = bukkitPlayer.getLocation().getBlockZ() >> 4;
             if (args.isEmpty()) {
                 double balance = EconomyService.INSTANCE.bankBalanceAt(DataStore.INSTANCE.snapshot(), world, cx, cz);
                 if (balance < 0) {
                     LangUtils.sendLang(player, Languages.COMMAND_BANK_UNCLAIMED);
                     return;
                 }
-                LangUtils.sendLang(player, Languages.COMMAND_BANK_BALANCE, Map.of("balance", money(balance)));
+                LangUtils.sendLang(player, Languages.COMMAND_BANK_BALANCE, Map.of("<balance>", money(balance)));
                 return;
             }
             String action = args.get(0).toLowerCase(Locale.ROOT);
@@ -189,16 +192,16 @@ public final class EconomyCommands {
                 return;
             }
             var future = deposit
-                ? EconomyService.INSTANCE.deposit(player.getUniqueId(), world, cx, cz, amount)
-                : EconomyService.INSTANCE.withdraw(player.getUniqueId(), world, cx, cz, amount);
-            future.whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
-                if (!player.isOnline() || throwable != null || result == null) {
+                ? EconomyService.INSTANCE.deposit(player.uniqueId(), world, cx, cz, amount)
+                : EconomyService.INSTANCE.withdraw(player.uniqueId(), world, cx, cz, amount);
+            future.whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
                 if (result.success()) {
                     LangUtils.sendLang(player,
                         deposit ? Languages.COMMAND_BANK_DEPOSIT_SUCCESS : Languages.COMMAND_BANK_WITHDRAW_SUCCESS,
-                        Map.of("amount", money(result.amount()), "balance", money(result.bankBalance())));
+                        Map.of("<amount>", money(result.amount()), "<balance>", money(result.bankBalance())));
                 } else {
                     sendFail(player, result.failureReason());
                 }
@@ -209,9 +212,14 @@ public final class EconomyCommands {
         public void onNoPerm(@NotNull Invoker invoker, @NotNull List<String> args) {
             LangUtils.sendLang(invoker, Languages.COMMAND_NO_PERM);
         }
+
+        @Override
+        public List<String> tabComplete(@NotNull Invoker invoker, @NotNull List<String> args) {
+            return args.size() == 1 ? List.of("deposit", "withdraw") : List.of();
+        }
     }
 
-    private static Integer parsePositiveInt(List<String> args, Player player) {
+    private static Integer parsePositiveInt(List<String> args, CommonPlayer player) {
         if (args.isEmpty()) {
             LangUtils.sendLang(player, Languages.COMMAND_ECONOMY_USAGE);
             return null;

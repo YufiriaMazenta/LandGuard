@@ -1,10 +1,12 @@
 package pers.yufiria.landguard.ui;
 
+import crypticlib.chat.BukkitTextProcessor;
 import crypticlib.lang.entry.StringLangEntry;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.IconDisplay;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -72,7 +74,7 @@ final class MenuSupport {
         for (Map.Entry<String, String> replacement : replacements.entrySet()) {
             raw = raw.replace(replacement.getKey(), replacement.getValue());
         }
-        return raw;
+        return BukkitTextProcessor.color(raw);
     }
 
     static String text(@Nullable Player player, @NotNull StringLangEntry entry) {
@@ -135,7 +137,7 @@ final class MenuSupport {
         if (online != null) {
             return online.getName();
         }
-        org.bukkit.OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(uuid.toString());
+        OfflinePlayer cached = Bukkit.getOfflinePlayerIfCached(uuid.toString());
         if (cached != null && cached.getName() != null) {
             return cached.getName();
         }

@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.ui;
 
 import crypticlib.CrypticLibBukkit;
+import crypticlib.lang.entry.StringLangEntry;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.MenuDisplay;
 import crypticlib.ui.display.MenuLayout;
@@ -12,11 +13,15 @@ import pers.yufiria.landguard.command.EconomyCommands;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.economy.EconomyService;
+import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * 领地银行页：展示脚下领地/组银行余额，固定档位纯点击存取。
@@ -34,7 +39,7 @@ public class BankMenu extends Menu {
 
     private final String claimId;
     private final int listPage;
-    private final java.util.UUID worldUuid;
+    private final UUID worldUuid;
     private final int chunkX;
     private final int chunkZ;
 
@@ -50,7 +55,7 @@ public class BankMenu extends Menu {
 
     private MenuDisplay buildDisplay() {
         Player player = player().orElse(null);
-        Map<Character, java.util.function.Supplier<Icon>> icons = new LinkedHashMap<>();
+        Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
         icons.put('r', () -> MenuSupport.backIcon(player,
             () -> new ClaimDetailMenu(player, claimId, listPage).openMenu()));
@@ -70,7 +75,7 @@ public class BankMenu extends Menu {
         setIcon(4, MenuSupport.icon(Material.GOLD_BLOCK,
             MenuSupport.text(player, Languages.MENU_BANK_BALANCE_NAME),
             List.of(MenuSupport.text(player, Languages.MENU_BANK_BALANCE_LORE,
-                Map.of("balance", balanceText)))));
+                Map.of("<balance>", balanceText)))));
         for (int i = 0; i < AMOUNTS.length; i++) {
             int amount = AMOUNTS[i];
             setIcon(10 + i, amountIcon(player, Material.EMERALD,
@@ -80,9 +85,9 @@ public class BankMenu extends Menu {
         }
     }
 
-    private Icon amountIcon(Player player, Material material, crypticlib.lang.entry.StringLangEntry nameEntry,
-                            crypticlib.lang.entry.StringLangEntry loreEntry, int amount, boolean deposit) {
-        Map<String, String> replacements = Map.of("amount", MenuSupport.money(amount));
+    private Icon amountIcon(Player player, Material material, StringLangEntry nameEntry,
+                            StringLangEntry loreEntry, int amount, boolean deposit) {
+        Map<String, String> replacements = Map.of("<amount>", MenuSupport.money(amount));
         Icon icon = MenuSupport.icon(material,
             MenuSupport.text(player, nameEntry, replacements),
             List.of(MenuSupport.text(player, loreEntry, replacements)));
@@ -106,17 +111,17 @@ public class BankMenu extends Menu {
         var future = deposit
             ? EconomyService.INSTANCE.deposit(player.getUniqueId(), worldUuid, chunkX, chunkZ, amount)
             : EconomyService.INSTANCE.withdraw(player.getUniqueId(), worldUuid, chunkX, chunkZ, amount);
-        future.whenComplete((result, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
+        future.whenComplete((result, throwable) -> Schedulers.onPlayer(player, () -> {
             if (!player.isOnline() || throwable != null || result == null) {
                 return;
             }
             if (result.success()) {
                 LangUtils.sendLang(player,
                     deposit ? Languages.COMMAND_BANK_DEPOSIT_SUCCESS : Languages.COMMAND_BANK_WITHDRAW_SUCCESS,
-                    Map.of("amount", MenuSupport.money(result.amount()),
-                        "balance", MenuSupport.money(result.bankBalance())));
+                    Map.of("<amount>", MenuSupport.money(result.amount()),
+                        "<balance>", MenuSupport.money(result.bankBalance())));
             } else {
-                EconomyCommands.sendFail(player, result.failureReason());
+                EconomyCommands.sendFail(CommandUtils.commonPlayer(player), result.failureReason());
             }
             updateMenu(true);
         }));

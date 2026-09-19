@@ -23,12 +23,14 @@ import pers.yufiria.landguard.protection.FlagService;
 import pers.yufiria.landguard.protection.ProtectionChecker;
 import pers.yufiria.landguard.protection.ProtectionFlag;
 import pers.yufiria.landguard.util.LangUtils;
+import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 /**
  * 单个身份维度的 flag 列表：左键在 允许 → 拒绝 → 默认（清除覆盖，回退全局矩阵）三态间循环。
@@ -95,7 +97,7 @@ public class FlagListMenu extends Menu {
 
     private MenuDisplay buildDisplay() {
         Player player = player().orElse(null);
-        Map<Character, java.util.function.Supplier<Icon>> icons = new LinkedHashMap<>();
+        Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
         icons.put('r', () -> MenuSupport.backIcon(player,
             () -> new FlagRoleMenu(player, claimId, listPage).openMenu()));
@@ -107,8 +109,8 @@ public class FlagListMenu extends Menu {
         ClaimData claim = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
         String claimName = claim == null || claim.getName() == null ? claimId : claim.getName();
         return MenuSupport.text(player, Languages.MENU_FLAG_TITLE, Map.of(
-            "name", claimName,
-            "role", roleDisplayName(player)
+            "<name>", claimName,
+            "<role>", roleDisplayName(player)
         ));
     }
 
@@ -145,15 +147,15 @@ public class FlagListMenu extends Menu {
 
         String stateText = state == null
             ? MenuSupport.text(player, Languages.MENU_FLAG_STATE_DEFAULT, Map.of(
-                "value", onOff(player, effective)))
+                "<value>", onOff(player, effective)))
             : MenuSupport.text(player, state ? Languages.MENU_FLAG_STATE_ALLOW
                 : Languages.MENU_FLAG_STATE_DENY);
         String prefix = state == null ? "&7" : (state ? "&a" : "&c");
         String flagName = MenuSupport.text(player, FLAG_NAMES.get(flag.id()));
         List<String> lore = List.of(
-            MenuSupport.text(player, Languages.MENU_FLAG_CURRENT, Map.of("state", stateText)),
+            MenuSupport.text(player, Languages.MENU_FLAG_CURRENT, Map.of("<state>", stateText)),
             MenuSupport.text(player, Languages.MENU_FLAG_DEFAULT, Map.of(
-                "value", onOff(player, defaultValue))),
+                "<value>", onOff(player, defaultValue))),
             MenuSupport.text(player, Languages.MENU_FLAG_HINT)
         );
         Icon icon = MenuSupport.icon(material, prefix + flagName, lore);
@@ -195,7 +197,7 @@ public class FlagListMenu extends Menu {
                 ? FlagService.INSTANCE.resetBehaviorOverride(claimId, roleId, flag)
                 : FlagService.INSTANCE.setBehaviorOverride(claimId, roleId, flag, next);
         }
-        future.whenComplete((ok, throwable) -> pers.yufiria.landguard.util.Schedulers.onPlayer(player, () -> {
+        future.whenComplete((ok, throwable) -> Schedulers.onPlayer(player, () -> {
             if (!player.isOnline() || throwable != null) {
                 return;
             }

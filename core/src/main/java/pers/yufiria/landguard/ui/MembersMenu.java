@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * 成员只读列表：展示当前所有者实体的全部成员及其角色标识。
@@ -53,7 +54,7 @@ public class MembersMenu extends Menu {
 
     private MenuDisplay buildDisplay() {
         Player player = player().orElse(null);
-        Map<Character, java.util.function.Supplier<Icon>> icons = new LinkedHashMap<>();
+        Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
         icons.put('p', () -> MenuSupport.arrow(player, false, page > 0, () -> changePage(page - 1)));
         icons.put('n', () -> MenuSupport.arrow(player, true, page < maxPage(memberIds()),
@@ -69,7 +70,7 @@ public class MembersMenu extends Menu {
         Player player = player().orElse(null);
         ClaimData claim = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
         String name = claim == null || claim.getName() == null ? claimId : claim.getName();
-        return MenuSupport.text(player, Languages.MENU_MEMBERS_TITLE, Map.of("name", name));
+        return MenuSupport.text(player, Languages.MENU_MEMBERS_TITLE, Map.of("<name>", name));
     }
 
     private List<UUID> memberIds() {
@@ -118,7 +119,7 @@ public class MembersMenu extends Menu {
                 role = "?";
             }
             List<String> lore = List.of(MenuSupport.text(player, Languages.MENU_MEMBERS_ENTRY_ROLE,
-                Map.of("role", role)));
+                Map.of("<role>", role)));
             setIcon(slot, MenuSupport.icon(Material.PLAYER_HEAD,
                 MenuSupport.displayName(memberId), lore));
         }
