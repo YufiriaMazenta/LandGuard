@@ -3,6 +3,7 @@ package pers.yufiria.landguard.util;
 import crypticlib.config.node.impl.bukkit.BooleanConfig;
 import crypticlib.config.node.impl.bukkit.DoubleConfig;
 import crypticlib.config.node.impl.bukkit.IntConfig;
+import crypticlib.config.node.impl.bukkit.StringConfig;
 
 /**
  * typed config 读取兜底：crypticlib ConfigNode 构造时 value 为 null，
@@ -25,6 +26,11 @@ public final class ConfigValues {
 
     public static double get(DoubleConfig config) {
         Double value = config.value();
+        return value != null ? value : config.def();
+    }
+
+    public static String get(StringConfig config) {
+        String value = config.value();
         return value != null ? value : config.def();
     }
 

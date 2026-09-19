@@ -10,6 +10,11 @@ public class Languages {
     public static final StringLangEntry UNSUPPORTED_VERSION = new StringLangEntry("unsupported_version");
     public static final StringLangEntry LOAD_FINISH = new StringLangEntry("load_finish");
 
+    // ================= 所有者类型显示 =================
+    public static final StringLangEntry OWNER_TYPE_PLAYER = new StringLangEntry("owner_type.player");
+    public static final StringLangEntry OWNER_TYPE_GROUP = new StringLangEntry("owner_type.group");
+    public static final StringLangEntry OWNER_TYPE_SERVER = new StringLangEntry("owner_type.server");
+
     public static final StringLangEntry COMMAND_NO_PERM = new StringLangEntry("command.no_perm");
     public static final StringLangEntry COMMAND_PLAYER_ONLY = new StringLangEntry("command.player_only");
     public static final StringLangEntry COMMAND_VERSION = new StringLangEntry("command.version");
@@ -23,6 +28,8 @@ public class Languages {
     public static final StringLangEntry COMMAND_CLAIM_RADIUS_TOO_LARGE = new StringLangEntry("command.claim.radius_too_large");
     public static final StringLangEntry COMMAND_CLAIM_AUTO_ON = new StringLangEntry("command.claim.auto_on");
     public static final StringLangEntry COMMAND_CLAIM_AUTO_OFF = new StringLangEntry("command.claim.auto_off");
+    public static final StringLangEntry COMMAND_BOUNDARY_ON = new StringLangEntry("command.boundary.on");
+    public static final StringLangEntry COMMAND_BOUNDARY_OFF = new StringLangEntry("command.boundary.off");
     public static final StringLangEntry COMMAND_UNCLAIM_SUCCESS = new StringLangEntry("command.unclaim.success");
     public static final StringLangEntry COMMAND_LIST_HEADER = new StringLangEntry("command.list.header");
     public static final StringLangEntry COMMAND_LIST_ENTRY = new StringLangEntry("command.list.entry");
@@ -40,8 +47,33 @@ public class Languages {
     public static final StringLangEntry COMMAND_FAIL_INVALID_TARGETS = new StringLangEntry("command.fail.invalid_targets");
     public static final StringLangEntry COMMAND_FAIL_NOT_CLAIMED = new StringLangEntry("command.fail.not_claimed");
     public static final StringLangEntry COMMAND_FAIL_NOT_OWNER = new StringLangEntry("command.fail.not_owner");
+    public static final StringLangEntry COMMAND_FAIL_INVALID_NAME = new StringLangEntry("command.fail.invalid_name");
+    public static final StringLangEntry COMMAND_FAIL_ALREADY_OWNED = new StringLangEntry("command.fail.already_owned");
+    public static final StringLangEntry COMMAND_FAIL_TARGET_HAS_CLAIM = new StringLangEntry("command.fail.target_has_claim");
+
+    // ================= 领地改名 / 转让 =================
+    public static final StringLangEntry COMMAND_RENAME_USAGE = new StringLangEntry("command.rename.usage");
+    public static final StringLangEntry COMMAND_RENAME_SUCCESS = new StringLangEntry("command.rename.success");
+    public static final StringLangEntry COMMAND_TRANSFER_USAGE = new StringLangEntry("command.transfer.usage");
+    public static final StringLangEntry COMMAND_TRANSFER_SUCCESS = new StringLangEntry("command.transfer.success");
+    public static final StringLangEntry COMMAND_TRANSFER_FAIL_PLAYER_NOT_FOUND = new StringLangEntry("command.transfer.fail.player_not_found");
+    public static final StringLangEntry COMMAND_TRANSFER_FAIL_GROUP_NOT_FOUND = new StringLangEntry("command.transfer.fail.group_not_found");
+    public static final StringLangEntry COMMAND_TRANSFER_GROUP_SUCCESS = new StringLangEntry("command.transfer.group_success");
 
     public static final StringLangEntry PROTECTION_DENIED = new StringLangEntry("protection.denied");
+
+    // ================= 进入/离开领地提示 =================
+    public static final StringLangEntry CLAIM_ENTER_NOTIFY = new StringLangEntry("claim.enter.notify");
+    public static final StringLangEntry CLAIM_ENTER_ACTIONBAR = new StringLangEntry("claim.enter.actionbar");
+    public static final StringLangEntry CLAIM_EXIT_NOTIFY = new StringLangEntry("claim.exit.notify");
+    public static final StringLangEntry CLAIM_EXIT_ACTIONBAR = new StringLangEntry("claim.exit.actionbar");
+
+    // ================= Hook 提示（控制台） =================
+    public static final StringLangEntry HOOK_VAULT_MISSING = new StringLangEntry("hook.vault.missing");
+    public static final StringLangEntry HOOK_VAULT_NO_PROVIDER = new StringLangEntry("hook.vault.no_provider");
+    public static final StringLangEntry HOOK_VAULT_HOOKED = new StringLangEntry("hook.vault.hooked");
+    public static final StringLangEntry HOOK_VAULT_API_MISSING = new StringLangEntry("hook.vault.api_missing");
+    public static final StringLangEntry HOOK_VAULT_ADAPTER_FAILED = new StringLangEntry("hook.vault.adapter_failed");
 
     // ================= 用户组 =================
     public static final StringLangEntry COMMAND_GROUP_USAGE = new StringLangEntry("command.group.usage");
@@ -54,9 +86,10 @@ public class Languages {
     public static final StringLangEntry COMMAND_GROUP_LEAVE_SUCCESS = new StringLangEntry("command.group.leave.success");
     public static final StringLangEntry COMMAND_GROUP_KICK_SUCCESS = new StringLangEntry("command.group.kick.success");
     public static final StringLangEntry COMMAND_GROUP_TRANSFER_SUCCESS = new StringLangEntry("command.group.transfer.success");
+    public static final StringLangEntry COMMAND_GROUP_RENAME_USAGE = new StringLangEntry("command.group.rename.usage");
+    public static final StringLangEntry COMMAND_GROUP_RENAME_SUCCESS = new StringLangEntry("command.group.rename.success");
     public static final StringLangEntry COMMAND_GROUP_ROLE_CREATED = new StringLangEntry("command.group.role.created");
     public static final StringLangEntry COMMAND_GROUP_ROLE_ASSIGNED = new StringLangEntry("command.group.role.assigned");
-    public static final StringLangEntry COMMAND_GROUP_GIVECLAIM_SUCCESS = new StringLangEntry("command.group.giveclaim.success");
     public static final StringLangEntry COMMAND_GROUP_LIST_HEADER = new StringLangEntry("command.group.list.header");
     public static final StringLangEntry COMMAND_GROUP_LIST_ENTRY = new StringLangEntry("command.group.list.entry");
     public static final StringLangEntry COMMAND_GROUP_LIST_EMPTY = new StringLangEntry("command.group.list.empty");
@@ -65,7 +98,8 @@ public class Languages {
     public static final StringLangEntry COMMAND_GROUP_INFO_LEADER = new StringLangEntry("command.group.info.leader");
     public static final StringLangEntry COMMAND_GROUP_INFO_MEMBERS = new StringLangEntry("command.group.info.members");
     public static final StringLangEntry COMMAND_GROUP_INFO_ROLES = new StringLangEntry("command.group.info.roles");
-    public static final StringLangEntry COMMAND_GROUP_FAIL_NAME_TAKEN = new StringLangEntry("command.group.fail.name_taken");
+    public static final StringLangEntry COMMAND_GROUP_FAIL_KEY_TAKEN = new StringLangEntry("command.group.fail.key_taken");
+    public static final StringLangEntry COMMAND_GROUP_FAIL_INVALID_KEY = new StringLangEntry("command.group.fail.invalid_key");
     public static final StringLangEntry COMMAND_GROUP_FAIL_INVALID_NAME = new StringLangEntry("command.group.fail.invalid_name");
     public static final StringLangEntry COMMAND_GROUP_FAIL_NOT_FOUND = new StringLangEntry("command.group.fail.not_found");
     public static final StringLangEntry COMMAND_GROUP_FAIL_NOT_LEADER = new StringLangEntry("command.group.fail.not_leader");
@@ -116,6 +150,7 @@ public class Languages {
     public static final StringLangEntry COMMAND_ADMIN_RELEASE_SUCCESS = new StringLangEntry("command.admin.release.success");
     public static final StringLangEntry COMMAND_ADMIN_TRANSFER_SUCCESS = new StringLangEntry("command.admin.transfer.success");
     public static final StringLangEntry COMMAND_ADMIN_EXEMPT_SET = new StringLangEntry("command.admin.exempt.set");
+    public static final StringLangEntry COMMAND_ADMIN_RENAME_SUCCESS = new StringLangEntry("command.admin.rename.success");
     public static final StringLangEntry COMMAND_ADMIN_RUN_DONE = new StringLangEntry("command.admin.run.done");
     public static final StringLangEntry COMMAND_ADMIN_INFO_ADMIN = new StringLangEntry("command.admin.info.admin");
     public static final StringLangEntry COMMAND_ADMIN_INFO_EXEMPT = new StringLangEntry("command.admin.info.exempt");
@@ -156,6 +191,12 @@ public class Languages {
     public static final StringLangEntry MENU_DETAIL_BANK_LORE = new StringLangEntry("menu.detail.bank_lore");
     public static final StringLangEntry MENU_DETAIL_UNCLAIM_NAME = new StringLangEntry("menu.detail.unclaim_name");
     public static final StringLangEntry MENU_DETAIL_UNCLAIM_LORE = new StringLangEntry("menu.detail.unclaim_lore");
+    public static final StringLangEntry MENU_DETAIL_RENAME_NAME = new StringLangEntry("menu.detail.rename_name");
+    public static final StringLangEntry MENU_DETAIL_RENAME_LORE = new StringLangEntry("menu.detail.rename_lore");
+    public static final StringLangEntry MENU_DETAIL_RENAME_PROMPT = new StringLangEntry("menu.detail.rename_prompt");
+    public static final StringLangEntry MENU_DETAIL_TRANSFER_NAME = new StringLangEntry("menu.detail.transfer_name");
+    public static final StringLangEntry MENU_DETAIL_TRANSFER_LORE = new StringLangEntry("menu.detail.transfer_lore");
+    public static final StringLangEntry MENU_DETAIL_TRANSFER_PROMPT = new StringLangEntry("menu.detail.transfer_prompt");
 
     public static final StringLangEntry MENU_ROLE_TITLE = new StringLangEntry("menu.role.title");
     public static final StringLangEntry MENU_ROLE_OWNER_NAME = new StringLangEntry("menu.role.owner_name");

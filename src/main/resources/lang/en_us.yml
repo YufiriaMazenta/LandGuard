@@ -13,6 +13,9 @@ command:
     radius_too_large: '<prefix> &cRadius exceeds the limit, maximum is <max>'
     auto_on: '<prefix> &aWalk auto-claim enabled: entering new chunks will claim them automatically'
     auto_off: '<prefix> &eWalk auto-claim disabled'
+  boundary:
+    on: '<prefix> &aClaim boundary rendering enabled; a particle outline will show when you enter a claim'
+    off: '<prefix> &eClaim boundary rendering disabled'
   unclaim:
     success: '<prefix> &eReleased &f<count>&e chunk(s), refunded &f<refunded>&e quota. Remaining quota: &f<available>'
   list:
@@ -34,15 +37,28 @@ command:
     invalid_targets: '<prefix> &cInvalid claim target'
     not_claimed: '<prefix> &cThe chunk you stand on is not claimed'
     not_owner: '<prefix> &cThis is not your land'
+    invalid_name: '<prefix> &cA claim name must be non-empty and at most 32 characters'
+    already_owned: '<prefix> &cThis claim already belongs to that player'
+    target_has_claim: '<prefix> &cThat player already owns a claim in this world; each player may own only one claim per world'
+  rename:
+    usage: '<prefix> &eUsage: &f/land rename <new name> &7(spaces allowed)'
+    success: '<prefix> &aClaim renamed to &f<name>'
+  transfer:
+    usage: '<prefix> &eUsage: &f/land transfer --player <player>&7 or &f/land transfer --group <group>&7 (transfers the claim you stand on; owner only)'
+    success: '<prefix> &aTransferred the claim you stand on to &f<player>'
+    group_success: '<prefix> &aThe claim under your feet was transferred to group &f<group>&a; chunks and settings kept'
+    fail:
+      player_not_found: '<prefix> &cPlayer not found (must be online or have joined this server before)'
+      group_not_found: '<prefix> &cGroup not found (the group id must match exactly)'
   group:
-    usage: '<prefix> &eUsage: &f/land group create|disband|invite|accept|deny|leave|kick|transfer|role|giveclaim|list|info'
+    usage: '<prefix> &eUsage: &f/land group create|disband|invite|accept|deny|leave|kick|transfer|rename|role|list|info&7; to give a claim to a group use &f/land transfer --group <group id>'
     create:
       success: '<prefix> &aGroup &f<group>&a created; you are the leader'
     disband:
       success: '<prefix> &eGroup &f<group>&e disbanded; its claims are now orphaned and await an admin'
     invite:
       sent: '<prefix> &aInvited &f<player>&a to group &f<group>'
-      received: '<prefix> &a<leader> invited you to group &f<group>&a. Use &f/land group accept <group>&a to join'
+      received: '<prefix> &a<leader> invited you to group &f<group>&a. Use &f/land group accept <group_id>&a to join'
     accept:
       success: '<prefix> &aYou joined group &f<group>&a; permissions are effective immediately'
     deny:
@@ -53,24 +69,26 @@ command:
       success: '<prefix> &eKicked &f<player>&e from group &f<group>&e; permissions revoked immediately'
     transfer:
       success: '<prefix> &aLeadership of &f<group>&a transferred to &f<player>&a; you are now a manager'
+    rename:
+      usage: '<prefix> &eUsage: &f/land group rename <group id> <new display name>'
+      success: '<prefix> &aGroup display name changed to &f<group>&a (the group id is unchanged)'
     role:
       created: '<prefix> &aRole &f<role>&a created in group &f<group>'
       assigned: '<prefix> &a<player> is now &f<role>&a in &f<group>&a; permissions effective immediately'
-    giveclaim:
-      success: '<prefix> &aThe claim under your feet was transferred to group &f<group>&a; chunks and settings kept'
     list:
       header: '<prefix> &aYour groups (<size>):'
-      entry: '&8- &f<group>'
-      empty: '<prefix> &7You are not in any group yet. Use &f/land group create <name>'
+      entry: '&8- &f<group> &7[&f<group_id>&7]'
+      empty: '<prefix> &7You are not in any group yet. Use &f/land group create <group id> [display name]'
     info:
       header: '<prefix> &aGroup info:'
-      name: '&8- &7Name: &f<group>'
+      name: '&8- &7Name: &f<group> &7[&f<group_id>&7]'
       leader: '&8- &7Leader: &f<leader>'
       members: '&8- &7Members: &f<members>'
       roles: '&8- &7Roles: &f<roles>'
     fail:
-      name_taken: '<prefix> &cThat group name is already taken'
-      invalid_name: '<prefix> &cInvalid group name (non-empty, up to 32 characters)'
+      key_taken: '<prefix> &cThat group id is already taken'
+      invalid_key: '<prefix> &cInvalid group id (1-32 lowercase letters, digits or underscores)'
+      invalid_name: '<prefix> &cInvalid display name (non-empty, up to 32 characters)'
       not_found: '<prefix> &cGroup not found'
       not_leader: '<prefix> &cOnly the group leader can do that'
       not_manager: '<prefix> &cOnly the group leader or a manager can do that'
@@ -109,7 +127,7 @@ command:
     forbidden: '<prefix> &cYour role is not allowed to withdraw from this claim bank'
     empty: '<prefix> &cThe claim bank does not have enough funds'
   admin:
-    usage: '<prefix> &eUsage: &f/land admin claim|unclaim [radius]&7, &ftransfer <player>&7, &frelease <claimId>&7, &fexempt <true|false>&7, &finfo&7, &forphans&7, &frun'
+    usage: '<prefix> &eUsage: &f/land admin claim|unclaim [radius]&7, &ftransfer <player>&7, &frelease <claimId>&7, &fexempt <true|false>&7, &frename <new name>&7, &finfo&7, &forphans&7, &frun'
     claim:
       success: '<prefix> &aCreated an admin claim (owned by server) covering &f<count>&a chunks; quota/adjacency limits and upkeep do not apply'
     unclaim:
@@ -120,6 +138,8 @@ command:
       success: '<prefix> &aClaim force-transferred to &f<player>&a (&f<chunks>&a chunks); upkeep/exempt state has been reset'
     exempt:
       set: '<prefix> &aUpkeep/reclamation exemption for this claim is now &f<exempt>'
+    rename:
+      success: '<prefix> &aRenamed claim &f<claim>&a to &f<name>'
     run:
       done: '<prefix> &aManual maintenance cycle finished: &f<charged>&a claims fully charged, &f<released>&a claims released'
     info:
@@ -135,8 +155,26 @@ command:
       invalid_player: '<prefix> &cPlayer not found (must be online or have joined this server before)'
       already_owned: '<prefix> &cThis claim already belongs to that player'
       invalid_argument: '<prefix> &cInvalid argument, please check the usage'
+claim:
+  enter:
+    notify: '<prefix> &aYou entered the claim &f<name>&a, owner: &f<owner>&7 (<type>)'
+    actionbar: '&aEntered claim &f<name> &7| &aOwner: &f<owner> &7(<type>)'
+  exit:
+    notify: '<prefix> &eYou left the claim &f<name>'
+    actionbar: '&eLeft claim &f<name>'
 protection:
   denied: '<prefix> &cYou are not allowed to do that in this claim'
+owner_type:
+  player: 'Player'
+  group: 'Group'
+  server: 'Server'
+hook:
+  vault:
+    missing: '<prefix> &eVault not found; economy features (buying blocks / claim bank) are disabled, everything else is unaffected'
+    no_provider: '<prefix> &eVault is installed but no economy provider is registered; economy features remain disabled'
+    hooked: '<prefix> &aHooked into the Vault economy: &f<name>'
+    api_missing: '<prefix> &eVault API not found; economy features remain disabled'
+    adapter_failed: '<prefix> &cFailed to initialize the Vault economy adapter; economy features remain disabled: &f<reason>'
 upkeep:
   debt:
     warning: '<prefix> &eThe bank of claim &f<name>&e cannot cover this upkeep payment and it has entered the debt grace period; please deposit funds soon or the claim will be released automatically'
@@ -176,6 +214,12 @@ menu:
     bank_lore: '&7View balance and deposit/withdraw funds'
     unclaim_name: '&cUnclaim the chunk under you'
     unclaim_lore: '&7Same as &f/land unclaim&7; only your own claims'
+    rename_name: '&dRename claim'
+    rename_lore: '&7Type the new claim name in chat'
+    rename_prompt: '<prefix> &eType the new claim name in chat, or &fcancel &eto abort'
+    transfer_name: '&bTransfer claim'
+    transfer_lore: '&7Give the claim you stand on to another player or group'
+    transfer_prompt: '<prefix> &eType &f--player <name> &eor &f--group <group id> &ein chat, or &fcancel &eto abort'
   role:
     title: '&8Permission settings - &f<name>'
     owner_name: '&6Owner'

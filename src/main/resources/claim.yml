@@ -30,3 +30,34 @@ quota:
 visualization:
   # 认领/查询后粒子边界的持续时间（tick），默认80（4秒）
   boundary_duration_ticks: 80
+  # 玩家进入领地时是否用粒子渲染该领地边界
+  # 玩家侧还可用 /land boundary 单独开关，两者都开启才会渲染
+  enter_boundary: true
+  enter_notify:
+    # 玩家进入领地时是否发送提示消息
+    enabled: true
+    # 提示消息的显示方式：actionbar（动作栏）、chat（聊天框）、both（两者都发）、none（不发送）
+    # 无法识别的值按 actionbar 处理
+    channel: actionbar
+  exit_notify:
+    # 玩家离开领地时是否发送提示消息（离开时不会渲染粒子边界）
+    enabled: true
+    # 离开提示的显示方式：actionbar（动作栏）、chat（聊天框）、both（两者都发）、none（不发送）
+    # 无法识别的值按 actionbar 处理
+    # 离开提示仅在你真正走到不属于任何领地的区域时发送；领地 A 直接穿入领地 B 不会发离开提示
+    channel: actionbar
+  particle:
+    # 边界粒子类型，填 Bukkit 粒子名，例如 DUST、FLAME、END_ROD、SOUL_FIRE_FLAME、ELECTRIC_SPARK、TOTEM_OF_UNDYING
+    # DUST（1.20.5 之前叫 REDSTONE）是彩色尘埃，颜色与大小由下面的 color/size 决定
+    # 需要额外数据的粒子（如 BLOCK、ITEM）不支持；无法识别的名字会回退为 DUST 并在控制台告警一次
+    type: DUST
+    # DUST 粒子的颜色，#RRGGBB 或 #AARRGGBB；仅 type 为 DUST/REDSTONE 时生效
+    color: '#FF3B30'
+    # DUST 粒子的尺寸倍率，越大越醒目，取值范围 0.1~4.0；仅 type 为 DUST/REDSTONE 时生效
+    size: 1.5
+    # 相邻粒子之间的间隔（方块），越小越密；过小会明显增加粒子包量，建议 0.25~2.0
+    step: 0.5
+    # 粒子重绘周期（tick），20tick=1秒；越小越连续，但也越耗性能
+    period_ticks: 10
+    # 边界线相对玩家脚底的高度偏移（方块），调高可避免粒子被草等地面方块遮挡
+    y_offset: 0.05

@@ -4,6 +4,7 @@ import crypticlib.config.ConfigHandler;
 import crypticlib.config.node.impl.bukkit.BooleanConfig;
 import crypticlib.config.node.impl.bukkit.DoubleConfig;
 import crypticlib.config.node.impl.bukkit.IntConfig;
+import crypticlib.config.node.impl.bukkit.StringConfig;
 
 import java.util.List;
 
@@ -94,6 +95,85 @@ public class ClaimConfigs {
         "visualization.boundary_duration_ticks",
         80,
         List.of("认领/查询后粒子边界的持续时间（tick），默认80（4秒）")
+    );
+
+    public static final BooleanConfig ENTER_BOUNDARY = new BooleanConfig(
+        "visualization.enter_boundary",
+        true,
+        List.of(
+            "玩家进入领地时是否用粒子渲染该领地边界",
+            "玩家侧还可用 /land boundary 单独开关，两者都开启才会渲染"
+        )
+    );
+
+    public static final BooleanConfig ENTER_NOTIFY_ENABLED = new BooleanConfig(
+        "visualization.enter_notify.enabled",
+        true,
+        List.of("玩家进入领地时是否发送提示消息")
+    );
+
+    public static final StringConfig ENTER_NOTIFY_CHANNEL = new StringConfig(
+        "visualization.enter_notify.channel",
+        "actionbar",
+        List.of(
+            "提示消息的显示方式：actionbar（动作栏）、chat（聊天框）、both（两者都发）、none（不发送）",
+            "无法识别的值按 actionbar 处理"
+        )
+    );
+
+    public static final BooleanConfig EXIT_NOTIFY_ENABLED = new BooleanConfig(
+        "visualization.exit_notify.enabled",
+        true,
+        List.of("玩家离开领地时是否发送提示消息（离开时不会渲染粒子边界）")
+    );
+
+    public static final StringConfig EXIT_NOTIFY_CHANNEL = new StringConfig(
+        "visualization.exit_notify.channel",
+        "actionbar",
+        List.of(
+            "离开领地时的提示通道，取值同 enter_notify.channel",
+            "离开提示仅在你真正走到不属于任何领地的区域时发送；领地 A 直接穿入领地 B 不会发离开提示"
+        )
+    );
+
+    public static final StringConfig BOUNDARY_PARTICLE_TYPE = new StringConfig(
+        "visualization.particle.type",
+        "DUST",
+        List.of(
+            "边界粒子类型，填 Bukkit 粒子名，例如 DUST、FLAME、END_ROD、SOUL_FIRE_FLAME、ELECTRIC_SPARK、TOTEM_OF_UNDYING",
+            "DUST（1.20.5 之前叫 REDSTONE）是彩色尘埃，颜色与大小由下面的 color/size 决定",
+            "需要额外数据的粒子（如 BLOCK、ITEM）不支持；无法识别的名字会回退为 DUST 并在控制台告警一次"
+        )
+    );
+
+    public static final StringConfig BOUNDARY_PARTICLE_COLOR = new StringConfig(
+        "visualization.particle.color",
+        "#FF3B30",
+        List.of("DUST 粒子的颜色，#RRGGBB 或 #AARRGGBB；仅 type 为 DUST/REDSTONE 时生效")
+    );
+
+    public static final DoubleConfig BOUNDARY_PARTICLE_SIZE = new DoubleConfig(
+        "visualization.particle.size",
+        1.5D,
+        List.of("DUST 粒子的尺寸倍率，越大越醒目，取值范围 0.1~4.0；仅 type 为 DUST/REDSTONE 时生效")
+    );
+
+    public static final DoubleConfig BOUNDARY_PARTICLE_STEP = new DoubleConfig(
+        "visualization.particle.step",
+        0.5D,
+        List.of("相邻粒子之间的间隔（方块），越小越密；过小会明显增加粒子包量，建议 0.25~2.0")
+    );
+
+    public static final IntConfig BOUNDARY_PARTICLE_PERIOD_TICKS = new IntConfig(
+        "visualization.particle.period_ticks",
+        10,
+        List.of("粒子重绘周期（tick），20tick=1秒；越小越连续，但也越耗性能")
+    );
+
+    public static final DoubleConfig BOUNDARY_PARTICLE_Y_OFFSET = new DoubleConfig(
+        "visualization.particle.y_offset",
+        0.05D,
+        List.of("边界线相对玩家脚底的高度偏移（方块），调高可避免粒子被草等地面方块遮挡")
     );
 
     private ClaimConfigs() {

@@ -13,6 +13,9 @@ command:
     radius_too_large: '<prefix> &c半径超出上限，最大为 <max>'
     auto_on: '<prefix> &a已开启行走自动认领，进入新区块时将自动尝试认领'
     auto_off: '<prefix> &e已关闭行走自动认领'
+  boundary:
+    on: '<prefix> &a已开启领地边界渲染，进入领地时会显示粒子边界'
+    off: '<prefix> &e已关闭领地边界渲染'
   unclaim:
     success: '<prefix> &e已放弃 &f<count>&e 个区块，返还额度 &f<refunded>&e，剩余额度：&f<available>'
   list:
@@ -34,15 +37,28 @@ command:
     invalid_targets: '<prefix> &c无效的认领目标'
     not_claimed: '<prefix> &c脚下区块不属于任何领地，无法放弃'
     not_owner: '<prefix> &c这不是你的领地，无法放弃'
+    invalid_name: '<prefix> &c领地名不能为空且不能超过 32 字符'
+    already_owned: '<prefix> &c该领地已经属于这个玩家，无需转让'
+    target_has_claim: '<prefix> &c该玩家在此世界已有领地，每个玩家在每个世界只能拥有一块领地'
+  rename:
+    usage: '<prefix> &e用法：&f/land rename <新名字> &7（名字可含空格）'
+    success: '<prefix> &a已把领地名改为 &f<name>'
+  transfer:
+    usage: '<prefix> &e用法：&f/land transfer --player <玩家名>&7 或 &f/land transfer --group <用户组名> &7（转让脚下领地，仅该领地所有者可操作）'
+    success: '<prefix> &a已把脚下领地转让给 &f<player>'
+    group_success: '<prefix> &a脚下领地已转让给用户组 &f<group>&a，区块与设置均保留'
+    fail:
+      player_not_found: '<prefix> &c找不到该玩家（需在线或曾经进服留有缓存）'
+      group_not_found: '<prefix> &c找不到该用户组（标识符需完全一致）'
   group:
-    usage: '<prefix> &e用法：&f/land group create|disband|invite|accept|deny|leave|kick|transfer|role|giveclaim|list|info&7，参数见帮助'
+    usage: '<prefix> &e用法：&f/land group create|disband|invite|accept|deny|leave|kick|transfer|rename|role|list|info&7，参数见帮助；把领地赠予用户组请用 &f/land transfer --group <组标识符>'
     create:
       success: '<prefix> &a用户组 &f<group>&a 创建成功，你是领袖'
     disband:
       success: '<prefix> &e用户组 &f<group>&e 已解散；其名下领地已进入无主流程，请等待管理员处理'
     invite:
       sent: '<prefix> &a已邀请 &f<player>&a 加入用户组 &f<group>'
-      received: '<prefix> &a<leader> 邀请你加入用户组 &f<group>&a，使用 &f/land group accept <group>&a 接受'
+      received: '<prefix> &a<leader> 邀请你加入用户组 &f<group>&a，使用 &f/land group accept <group_id>&a 接受'
     accept:
       success: '<prefix> &a你已加入用户组 &f<group>&a，组内领地权限已立即生效'
     deny:
@@ -53,24 +69,26 @@ command:
       success: '<prefix> &e已将 &f<player>&e 移出用户组 &f<group>&e，其权限已立即收回'
     transfer:
       success: '<prefix> &a用户组 &f<group>&a 的领袖已转让给 &f<player>&a，你现在是管理者'
+    rename:
+      usage: '<prefix> &e用法：&f/land group rename <组标识符> <新展示名>'
+      success: '<prefix> &a已把用户组展示名改为 &f<group>&a（标识符不变）'
     role:
       created: '<prefix> &a用户组 &f<group>&a 的角色 &f<role>&a 已创建'
       assigned: '<prefix> &a已将 &f<player>&a 在 &f<group>&a 中的角色设为 &f<role>&a，权限立即生效'
-    giveclaim:
-      success: '<prefix> &a脚下领地已转让给用户组 &f<group>&a，区块与设置均保留'
     list:
       header: '<prefix> &a你加入的用户组（共 <size> 个）：'
-      entry: '&8- &f<group>'
-      empty: '<prefix> &7你还没有加入任何用户组，使用 &f/land group create <名称> &7创建'
+      entry: '&8- &f<group> &7[&f<group_id>&7]'
+      empty: '<prefix> &7你还没有加入任何用户组，使用 &f/land group create <标识符> [展示名] &7创建'
     info:
       header: '<prefix> &a用户组信息：'
-      name: '&8- &7名称: &f<group>'
+      name: '&8- &7名称: &f<group> &7[&f<group_id>&7]'
       leader: '&8- &7领袖: &f<leader>'
       members: '&8- &7成员: &f<members>'
       roles: '&8- &7角色: &f<roles>'
     fail:
-      name_taken: '<prefix> &c该用户组名称已被使用'
-      invalid_name: '<prefix> &c无效的用户组名称（非空且不超过 32 字符）'
+      key_taken: '<prefix> &c该用户组标识符已被占用'
+      invalid_key: '<prefix> &c无效的标识符（1-32 位小写字母、数字、下划线）'
+      invalid_name: '<prefix> &c无效的展示名（非空且不超过 32 字符）'
       not_found: '<prefix> &c用户组不存在'
       not_leader: '<prefix> &c只有用户组领袖才能执行此操作'
       not_manager: '<prefix> &c只有用户组领袖或管理者才能执行此操作'
@@ -109,7 +127,7 @@ command:
     forbidden: '<prefix> &c你的角色没有从该领地银行取款的权限'
     empty: '<prefix> &c领地银行余额不足'
   admin:
-    usage: '<prefix> &e用法：&f/land admin claim|unclaim [半径]&7，&ftransfer <玩家>&7，&frelease <领地ID>&7，&fexempt <true|false>&7，&finfo&7，&forphans&7，&frun'
+    usage: '<prefix> &e用法：&f/land admin claim|unclaim [半径]&7，&ftransfer <玩家>&7，&frelease <领地ID>&7，&fexempt <true|false>&7，&frename <新名字>&7，&finfo&7，&forphans&7，&frun'
     claim:
       success: '<prefix> &a已创建管理领地（server 所有），本次纳入 &f<count>&a 个区块，不受额度与相邻规则限制且豁免维护费'
     unclaim:
@@ -120,6 +138,8 @@ command:
       success: '<prefix> &a已将领地强制转让给 &f<player>&a（&f<chunks>&a 个区块），维护费/豁免状态已重置'
     exempt:
       set: '<prefix> &a该领地的维护费/回收豁免已设为 &f<exempt>'
+    rename:
+      success: '<prefix> &a已把领地 &f<claim>&a 的名字改为 &f<name>'
     run:
       done: '<prefix> &a手动回收周期完成：足额扣费 &f<charged>&a 个领地，自动释放 &f<released>&a 个领地'
     info:
@@ -135,8 +155,26 @@ command:
       invalid_player: '<prefix> &c找不到该玩家（需要在线或曾经进服留有缓存）'
       already_owned: '<prefix> &c该领地已经属于该玩家'
       invalid_argument: '<prefix> &c参数无效，请检查用法'
+claim:
+  enter:
+    notify: '<prefix> &a你已进入领地 &f<name>&a，所有者：&f<owner>&7（<type>）'
+    actionbar: '&a已进入领地 &f<name> &7| &a所有者：&f<owner> &7(<type>)'
+  exit:
+    notify: '<prefix> &e你已离开领地 &f<name>'
+    actionbar: '&e已离开领地 &f<name>'
 protection:
   denied: '<prefix> &c你没有权限在此领地执行该操作'
+owner_type:
+  player: '玩家'
+  group: '用户组'
+  server: '服务器'
+hook:
+  vault:
+    missing: '<prefix> &e未检测到 Vault，经济功能（买卖额度/领地银行）自动禁用，其余功能不受影响'
+    no_provider: '<prefix> &e已安装 Vault 但没有任何经济服务提供者，经济功能保持禁用'
+    hooked: '<prefix> &a已接入 Vault 经济：&f<name>'
+    api_missing: '<prefix> &e找不到 Vault API，经济功能保持禁用'
+    adapter_failed: '<prefix> &cVault 经济适配器初始化失败，经济功能保持禁用：&f<reason>'
 upkeep:
   debt:
     warning: '<prefix> &e领地 &f<name>&e 的银行余额不足以支付本期维护费，已进入欠费宽限期；请尽快存入资金，宽限期满领地将被自动释放'
@@ -176,6 +214,12 @@ menu:
     bank_lore: '&7查看余额并存取资金'
     unclaim_name: '&c放弃脚下区块'
     unclaim_lore: '&7等价于 &f/land unclaim&7，只能放弃你自己的领地'
+    rename_name: '&d重命名领地'
+    rename_lore: '&7在聊天中输入新的领地名字'
+    rename_prompt: '<prefix> &e请在聊天中输入新的领地名字，输入 &fcancel &e取消'
+    transfer_name: '&b转让领地'
+    transfer_lore: '&7把脚下领地转让给其他玩家或用户组'
+    transfer_prompt: '<prefix> &e请在聊天中输入 &f--player <玩家名> &e或 &f--group <组标识符>&e，输入 &fcancel &e取消'
   role:
     title: '&8权限设置 - &f<name>'
     owner_name: '&6所有者（owner）'
