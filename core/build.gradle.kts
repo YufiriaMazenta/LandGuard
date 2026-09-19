@@ -16,6 +16,8 @@ dependencies {
     implementation("com.crypticlib:bukkit-ui:${rootProject.findProperty("crypticlibVer")}")
     implementation("com.crypticlib:bukkit-i18n:${rootProject.findProperty("crypticlibVer")}")
     implementation("com.crypticlib:bukkit-util:${rootProject.findProperty("crypticlibVer")}")
+    implementation("com.crypticlib:bukkit-particle:${rootProject.findProperty("crypticlibVer")}")
+    implementation("com.crypticlib:bukkit-conversation:${rootProject.findProperty("crypticlibVer")}")
     implementation("com.crypticlib:common-compat:${rootProject.findProperty("crypticlibVer")}")
     implementation("com.crypticlib:common-database:${rootProject.findProperty("crypticlibVer")}")
     implementation("com.crypticlib:common-util:${rootProject.findProperty("crypticlibVer")}")
@@ -33,5 +35,20 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+}
+
+// 微基准对同 JVM 内的其它测试压力敏感（被全量套件干扰时会被测得虚高而误判失败），
+// 因此从默认 test 排除，放到独立任务里独占一个 fork。
+tasks.named<Test>("test") {
+    exclude("**/ProtectionHotPathBenchmarkTest.*")
+}
+
+tasks.register<Test>("benchmark") {
+    description = "TR-13.1 hot-path 微基准：独立 JVM 跑，避免被套件其它测试干扰"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    include("**/ProtectionHotPathBenchmarkTest.*")
     useJUnitPlatform()
 }
