@@ -28,6 +28,8 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.14.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.1")
     testRuntimeOnly("org.xerial:sqlite-jdbc:3.46.1.3")
+    //仅测试期提供, 生产环境由服务端提供 MySQL 驱动
+    testRuntimeOnly("com.mysql:mysql-connector-j:${rootProject.findProperty("mysqlDriverVer")}")
 }
 
 tasks.withType<Test>().configureEach {
