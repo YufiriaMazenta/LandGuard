@@ -1,0 +1,17 @@
+# LandGuard 配置文件
+
+# 是否输出调试信息
+debug: false
+
+# 是否允许插件通过 bStats 收集使用信息
+bstats: true
+
+# 插件主命令的别名，只在插件启动时读取一次
+main_command_aliases:
+  - landguard
+  - lg
+
+owner:
+  # 所有者成员资格的周期性全量校正间隔（tick），20tick=1秒，默认1200（60秒）
+  # 作为第三方组织插件漏发成员变更事件时的兜底，设为0可关闭
+  membership_revalidate_interval_ticks: 1200

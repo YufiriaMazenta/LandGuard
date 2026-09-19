@@ -1,0 +1,32 @@
+# LandGuard 认领规则与额度配置
+
+claim:
+  # 新建/扩容区块是否要求与本人已有领地相邻（首个领地不受限）
+  require_adjacent: true
+  # 相邻判定是否把对角线相接也算相邻；false 时仅上下左右四方向
+  allow_diagonal_adjacent: false
+  # /land claim radius 允许的最大半径（以站立区块为中心，1=单区块，2=3x3，以此类推）
+  max_radius: 16
+  # 放弃区块时返还的额度比例，0.0~1.0；0=不返还，1.0=全额返还
+  unclaim_return_ratio: 0.5
+
+quota:
+  # 玩家首次进入服务器时获得的初始区块额度
+  start_chunks: 64
+  # 每小时有效游戏时长累积的区块额度；只统计有位移的活跃时间，挂机不累积
+  accrued_chunks_per_hour: 6
+  # 游戏时长累积额度的上限（初始额度与购买额度不受此限）
+  max_accrued_chunks: 512
+  # 活跃度采样间隔（tick），20tick=1秒，默认1200（60秒）
+  activity_sample_interval_ticks: 1200
+  # 一个采样间隔内至少水平移动的格数，低于该值视为挂机；旁观者模式不累积
+  activity_min_moved_blocks: 8
+  group:
+    # 用户组基础区块额度（Task 7 用户组接入后生效，当前为占位配置）
+    base_chunks: 256
+    # 用户组每名成员额外贡献的区块额度（Task 7 用户组接入后生效，当前为占位配置）
+    bonus_per_member: 16
+
+visualization:
+  # 认领/查询后粒子边界的持续时间（tick），默认80（4秒）
+  boundary_duration_ticks: 80

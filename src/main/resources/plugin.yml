@@ -1,0 +1,17 @@
+name: LandGuard
+version: '${version}'
+description: Modern organization-oriented chunk land protection plugin
+main: pers.yufiria.landguard.LandGuard
+api-version: '1.20'
+load: POSTWORLD
+softdepend:
+  - Vault
+  - PlaceholderAPI
+authors: [ YufiriaMazenta ]
+folia-supported: true
+website: https://github.com/YufiriaMazenta/LandGuard
+permissions:
+  landguard.bypass:
+    description: 绕过全部领地行为保护判定。独立于管理命令权限，默认不授予任何人（含 OP），需显式分配
+    default: false
+

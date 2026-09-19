@@ -1,0 +1,240 @@
+command:
+  no_perm: '<prefix> &c你没有使用此命令的权限'
+  player_only: '<prefix> &c只有玩家才能执行此命令'
+  version: '<prefix> &a当前 LandGuard 版本: &f<version>'
+  reload:
+    reloading: '<prefix> &a插件正在重载中，请稍等'
+    success: '<prefix> &a插件重载成功'
+    exception: '<prefix> &c插件重载过程中发生错误，请查看控制台'
+  claim:
+    success: '<prefix> &a成功认领 &f<count>&a 个区块，剩余额度：&f<available>'
+    usage: '<prefix> &e用法：&f/land claim&7（认领脚下区块）&e，&f/land claim radius <半径>&7（方形批量）&e，&f/land claim auto&7（切换行走自动认领）'
+    radius_invalid: '<prefix> &c半径必须是不小于 1 的整数'
+    radius_too_large: '<prefix> &c半径超出上限，最大为 <max>'
+    auto_on: '<prefix> &a已开启行走自动认领，进入新区块时将自动尝试认领'
+    auto_off: '<prefix> &e已关闭行走自动认领'
+  unclaim:
+    success: '<prefix> &e已放弃 &f<count>&e 个区块，返还额度 &f<refunded>&e，剩余额度：&f<available>'
+  list:
+    header: '<prefix> &a你的领地（共 <size> 个）：'
+    entry: '&8- &f<name> &7[<world>] &7区块数: &f<chunks>'
+    empty: '<prefix> &7你还没有任何领地，使用 &f/land claim &7认领脚下区块'
+  info:
+    unclaimed: '<prefix> &7此处是 &f野外&7，任何人都不受领地规则保护'
+    header: '<prefix> &a领地信息：'
+    name: '&8- &7名称: &f<name>'
+    owner: '&8- &7所有者: &f<owner> &7(<type>)'
+    world: '&8- &7世界: &f<world>'
+    chunks: '&8- &7区块数: &f<chunks>'
+    created: '&8- &7创建时间: &f<created>'
+  fail:
+    overlap: '<prefix> &c目标区块已被认领，不能重叠认领'
+    not_adjacent: '<prefix> &c目标区块与你已有的领地不相邻（必须相连才能扩容）'
+    quota_exceeded: '<prefix> &c区块额度不足，可稍后通过游戏时长累积或购买额度'
+    invalid_targets: '<prefix> &c无效的认领目标'
+    not_claimed: '<prefix> &c脚下区块不属于任何领地，无法放弃'
+    not_owner: '<prefix> &c这不是你的领地，无法放弃'
+  group:
+    usage: '<prefix> &e用法：&f/land group create|disband|invite|accept|deny|leave|kick|transfer|role|giveclaim|list|info&7，参数见帮助'
+    create:
+      success: '<prefix> &a用户组 &f<group>&a 创建成功，你是领袖'
+    disband:
+      success: '<prefix> &e用户组 &f<group>&e 已解散；其名下领地已进入无主流程，请等待管理员处理'
+    invite:
+      sent: '<prefix> &a已邀请 &f<player>&a 加入用户组 &f<group>'
+      received: '<prefix> &a<leader> 邀请你加入用户组 &f<group>&a，使用 &f/land group accept <group>&a 接受'
+    accept:
+      success: '<prefix> &a你已加入用户组 &f<group>&a，组内领地权限已立即生效'
+    deny:
+      success: '<prefix> &e你已拒绝用户组 &f<group>&e 的邀请'
+    leave:
+      success: '<prefix> &e你已退出用户组 &f<group>&e，相关权限已立即收回'
+    kick:
+      success: '<prefix> &e已将 &f<player>&e 移出用户组 &f<group>&e，其权限已立即收回'
+    transfer:
+      success: '<prefix> &a用户组 &f<group>&a 的领袖已转让给 &f<player>&a，你现在是管理者'
+    role:
+      created: '<prefix> &a用户组 &f<group>&a 的角色 &f<role>&a 已创建'
+      assigned: '<prefix> &a已将 &f<player>&a 在 &f<group>&a 中的角色设为 &f<role>&a，权限立即生效'
+    giveclaim:
+      success: '<prefix> &a脚下领地已转让给用户组 &f<group>&a，区块与设置均保留'
+    list:
+      header: '<prefix> &a你加入的用户组（共 <size> 个）：'
+      entry: '&8- &f<group>'
+      empty: '<prefix> &7你还没有加入任何用户组，使用 &f/land group create <名称> &7创建'
+    info:
+      header: '<prefix> &a用户组信息：'
+      name: '&8- &7名称: &f<group>'
+      leader: '&8- &7领袖: &f<leader>'
+      members: '&8- &7成员: &f<members>'
+      roles: '&8- &7角色: &f<roles>'
+    fail:
+      name_taken: '<prefix> &c该用户组名称已被使用'
+      invalid_name: '<prefix> &c无效的用户组名称（非空且不超过 32 字符）'
+      not_found: '<prefix> &c用户组不存在'
+      not_leader: '<prefix> &c只有用户组领袖才能执行此操作'
+      not_manager: '<prefix> &c只有用户组领袖或管理者才能执行此操作'
+      not_member: '<prefix> &c你不是该用户组的成员'
+      target_not_member: '<prefix> &c目标玩家不是该用户组的成员'
+      already_member: '<prefix> &c该玩家已经是用户组成员'
+      no_invite: '<prefix> &c你没有该用户组的待处理邀请'
+      leader_cannot_leave: '<prefix> &c领袖不能直接退出，请先转让领袖或解散用户组'
+      cannot_kick: '<prefix> &c你不能踢出该成员（管理者/领袖受保护）'
+      role_exists: '<prefix> &c该角色标识在组内已存在'
+      role_not_found: '<prefix> &c角色不存在，请先由领袖/管理者创建'
+      role_id_invalid: '<prefix> &c角色标识无效（1-32 位小写字母、数字、下划线），或优先级不是整数'
+      role_builtin: '<prefix> &c内置角色标识不能被创建或这样分配（领袖请使用 transfer）'
+      claim_not_found: '<prefix> &c脚下区块不属于任何领地'
+      not_claim_owner: '<prefix> &c只能把你自己名下的个人领地转让给用户组'
+      target_not_found: '<prefix> &c找不到该玩家（需要在线或曾经进服留有缓存）'
+  economy:
+    unavailable: '<prefix> &c经济功能当前不可用（未安装 Vault 经济或已被服务器关闭），买卖与银行操作已禁用'
+    usage: '<prefix> &e用法：&f/land buy|sell <区块数>'
+    invalid_amount: '<prefix> &c金额/数量无效，请输入大于 0 的数字'
+    insufficient_funds: '<prefix> &c你的余额不足'
+    quota_in_use: '<prefix> &c这些额度正被已认领区块占用，无法出售；请先放弃相应区块'
+    nothing_to_sell: '<prefix> &c你没有这么多可出售的购买额度'
+  buy:
+    success: '<prefix> &a购买成功：&f<chunks> &a个区块额度，花费 &f<cost>&a，当前余额 &f<balance>'
+  sell:
+    success: '<prefix> &a出售成功：返还 &f<chunks> &a个区块额度，获得 &f<refund>&a，当前余额 &f<balance>'
+  bank:
+    usage: '<prefix> &e用法：&f/land bank [deposit|withdraw <金额>]'
+    balance: '<prefix> &a当前领地银行余额：&f<balance>'
+    deposit:
+      success: '<prefix> &a已向领地银行存入 &f<amount>&a，银行余额 &f<balance>'
+    withdraw:
+      success: '<prefix> &a已从领地银行取出 &f<amount>&a，银行余额 &f<balance>'
+    unclaimed: '<prefix> &c脚下区块不属于任何领地，无法使用银行'
+    forbidden: '<prefix> &c你的角色没有从该领地银行取款的权限'
+    empty: '<prefix> &c领地银行余额不足'
+  admin:
+    usage: '<prefix> &e用法：&f/land admin claim|unclaim [半径]&7，&ftransfer <玩家>&7，&frelease <领地ID>&7，&fexempt <true|false>&7，&finfo&7，&forphans&7，&frun'
+    claim:
+      success: '<prefix> &a已创建管理领地（server 所有），本次纳入 &f<count>&a 个区块，不受额度与相邻规则限制且豁免维护费'
+    unclaim:
+      success: '<prefix> &e已强制放弃 &f<count>&e 个区块（不校验归属，不返还额度）'
+    release:
+      success: '<prefix> &e已强制释放领地 &f<claim>&e（&f<chunks>&e 个区块归还野外）'
+    transfer:
+      success: '<prefix> &a已将领地强制转让给 &f<player>&a（&f<chunks>&a 个区块），维护费/豁免状态已重置'
+    exempt:
+      set: '<prefix> &a该领地的维护费/回收豁免已设为 &f<exempt>'
+    run:
+      done: '<prefix> &a手动回收周期完成：足额扣费 &f<charged>&a 个领地，自动释放 &f<released>&a 个领地'
+    info:
+      admin: '&8- &7管理领地: &f<admin> &7| ID: &f<claim>'
+      exempt: '&8- &7豁免维护费/回收: &f<exempt>'
+      orphan: '&8- &7孤儿状态: &f<orphan>'
+    orphans:
+      header: '<prefix> &e孤儿领地（共 <size> 个）：'
+      entry: '&8- &f<name> &7[<type>:<owner>] &7区块: &f<chunks> &7已孤儿 &f<days>&7 天 &7ID: &f<claim>'
+      empty: '<prefix> &7当前没有孤儿领地'
+    fail:
+      claim_not_found: '<prefix> &c指定领地不存在或脚下没有领地'
+      invalid_player: '<prefix> &c找不到该玩家（需要在线或曾经进服留有缓存）'
+      already_owned: '<prefix> &c该领地已经属于该玩家'
+      invalid_argument: '<prefix> &c参数无效，请检查用法'
+protection:
+  denied: '<prefix> &c你没有权限在此领地执行该操作'
+upkeep:
+  debt:
+    warning: '<prefix> &e领地 &f<name>&e 的银行余额不足以支付本期维护费，已进入欠费宽限期；请尽快存入资金，宽限期满领地将被自动释放'
+    released: '<prefix> &c领地 &f<name>&c 因欠费超过宽限期已被自动释放（&f<chunks>&c 个区块归还野外）'
+  inactivity:
+    warning: '<prefix> &e领地 &f<name>&e 已长期无人活跃，已进入回收宽限期；请所有者成员在宽限期内登录，否则领地将被自动释放'
+    released: '<prefix> &c领地 &f<name>&c 因长期无人活跃已被自动释放（&f<chunks>&c 个区块归还野外）'
+  orphan:
+    warning: '<prefix> &e领地 &f<name>&e 的所有者实体已不存在（组织解散或提供方注销），进入孤儿宽限期；请管理员及时处理，宽限期满将自动释放'
+    released: '<prefix> &c孤儿领地 &f<name>&c 超过宽限期仍无人接管，已被自动释放（&f<chunks>&c 个区块归还野外）'
+menu:
+  common:
+    back: '&7返回上一页'
+    prev_page: '&7上一页'
+    next_page: '&7下一页'
+  list:
+    title: '&8我的领地 &7(<page>/<max_page>)'
+    entry_name: '&f<name>'
+    entry_world: '&7世界: &f<world>'
+    entry_chunks: '&7区块数: &f<chunks>'
+    entry_owner: '&7所有者: &f<owner>'
+    empty: '&7你还没有可见的领地，点击下方金铲认领'
+    claim_here_name: '&a认领脚下区块'
+    claim_here_lore: '&7等价于 &f/land claim&7，受相邻与额度规则限制'
+  detail:
+    title: '&8领地: &f<name>'
+    info_name: '&f<name>'
+    info_owner: '&7所有者: &f<owner> &7(<type>)'
+    info_world: '&7世界: &f<world>'
+    info_chunks: '&7区块数: &f<chunks>'
+    info_created: '&7创建时间: &f<created>'
+    flags_name: '&e权限（flag）设置'
+    flags_lore: '&7按角色切换行为/自然保护开关'
+    members_name: '&b成员列表'
+    members_lore: '&7只读查看；成员管理请使用用户组命令'
+    bank_name: '&6领地银行'
+    bank_lore: '&7查看余额并存取资金'
+    unclaim_name: '&c放弃脚下区块'
+    unclaim_lore: '&7等价于 &f/land unclaim&7，只能放弃你自己的领地'
+  role:
+    title: '&8权限设置 - &f<name>'
+    owner_name: '&6所有者（owner）'
+    owner_lore: '&7领地最高身份的默认行为矩阵'
+    manager_name: '&c管理者（manager）'
+    manager_lore: '&7被授予管理权限的成员'
+    member_name: '&a普通成员（member）'
+    member_lore: '&7加入领地的普通玩家'
+    visitor_name: '&7访客（visitor）'
+    visitor_lore: '&7非成员玩家的默认身份'
+    natural_name: '&2自然环境保护'
+    natural_lore: '&7爆炸、火焰、流体、活塞、怪物等环境开关'
+  flag:
+    title: '&8<role> &7- &f<name>'
+    current: '&7当前状态: <state>'
+    default_line: '&7全局默认: <value>'
+    hint: '&e左键循环: 允许 → 拒绝 → 默认'
+    state_allow: '&a允许'
+    state_deny: '&c拒绝'
+    state_default: '&7默认（生效: <value>）'
+    id:
+      place: '放置方块'
+      break: '破坏方块'
+      container: '访问容器'
+      door: '门与栅栏门'
+      redstone: '红石机关'
+      crafting: '工作台使用'
+      vehicle: '载具使用'
+      animal: '动物交互'
+      display: '展示实体'
+      planting: '种植'
+      harvest: '采收'
+      item: '物品拾取/丢弃'
+      bank: '银行取款'
+      pvp: '玩家战斗（PvP）'
+      explosion: '爆炸破坏'
+      fire_spread: '火焰蔓延'
+      fluid_flow: '流体流动'
+      piston: '活塞推拉'
+      mob_spawn: '怪物生成'
+      mob_grief: '怪物破坏'
+      trample: '作物踩踏'
+  members:
+    title: '&8成员 - &f<name>'
+    entry_role: '&7角色: &f<role>'
+    empty: '&7该所有者实体当前没有成员'
+    hint: '&7成员管理（邀请/踢除/角色）请使用 &f/land group&7；个人领地无成员'
+  bank:
+    title: '&8领地银行'
+    balance_name: '&6银行余额'
+    balance_lore: '&f<balance>'
+    deposit_name: '&a存入 <amount>'
+    deposit_lore: '&7从你的账户存入领地/组银行'
+    withdraw_name: '&c取出 <amount>'
+    withdraw_lore: '&7取出到你的账户（需要银行取款权限）'
+  fail:
+    not_manager: '<prefix> &c只有领地的所有者或管理者才能修改权限'
+    not_standing: '<prefix> &c你当前没有站在该领地内，无法执行此操作'
+
+prefix: '&8[&aLandGuard&8]'
+unsupported_version: '<prefix> &c不支持的服务端版本，需要 1.20 或更高版本'
+load_finish: '<prefix> &aLandGuard 加载完成'

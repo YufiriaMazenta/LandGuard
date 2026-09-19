@@ -1,0 +1,23 @@
+# 使用什么类型的数据库, 支持sqlite和mysql
+type: sqlite
+
+# SQLite专用配置
+sqlite:
+  # 数据库文件路径（相对或绝对）
+  file: "plugins/LandGuard/data.db"
+  parameters: "foreign_keys=on&journal_mode=WAL"
+
+# MySQL专用配置
+mysql:
+  host: "localhost"
+  port: 3306
+  database: "landguard"
+  username: "root"
+  password: "your_password"
+  parameters: "useSSL=false&serverTimezone=UTC"
+  pool:
+    max_connections: 8
+    max_idle_time_ms: 60000
+    max_lifetime_ms: 1800000
+    check_connections_every_ms: 5000
+    test_before_get: true

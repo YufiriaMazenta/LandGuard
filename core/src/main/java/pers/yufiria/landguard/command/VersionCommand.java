@@ -1,0 +1,31 @@
+package pers.yufiria.landguard.command;
+
+import crypticlib.Invoker;
+import crypticlib.command.CommandInfo;
+import crypticlib.command.CommandNode;
+import crypticlib.perm.PermInfo;
+import org.jetbrains.annotations.NotNull;
+import pers.yufiria.landguard.config.Languages;
+import pers.yufiria.landguard.util.LangUtils;
+
+import java.util.List;
+
+public final class VersionCommand extends CommandNode {
+
+    public static final VersionCommand INSTANCE = new VersionCommand();
+
+    private VersionCommand() {
+        super(CommandInfo.builder("version").permission(new PermInfo("landguard.command.version")).build());
+    }
+
+    @Override
+    public void execute(@NotNull Invoker invoker, List<String> args) {
+        LangUtils.sendLang(invoker, Languages.COMMAND_VERSION);
+    }
+
+    @Override
+    public void onNoPerm(@NotNull Invoker invoker, @NotNull List<String> args) {
+        LangUtils.sendLang(invoker, Languages.COMMAND_NO_PERM);
+    }
+
+}
