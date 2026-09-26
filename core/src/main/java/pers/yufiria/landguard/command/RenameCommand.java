@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -14,7 +15,6 @@ import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -55,7 +55,7 @@ public final class RenameCommand extends CommandNode {
         // 名字允许带空格，整段参数拼接后再交给服务层 trim 与长度校验
         String name = String.join(" ", args);
         ClaimService.INSTANCE.renameClaim(player.uniqueId(), claimId, name)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }

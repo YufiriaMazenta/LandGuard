@@ -15,7 +15,6 @@ import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.economy.EconomyService;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -111,7 +110,7 @@ public class BankMenu extends Menu {
         var future = deposit
             ? EconomyService.INSTANCE.deposit(player.getUniqueId(), worldUuid, chunkX, chunkZ, amount)
             : EconomyService.INSTANCE.withdraw(player.getUniqueId(), worldUuid, chunkX, chunkZ, amount);
-        future.whenComplete((result, throwable) -> Schedulers.onPlayer(player, () -> {
+        future.whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
             if (!player.isOnline() || throwable != null || result == null) {
                 return;
             }

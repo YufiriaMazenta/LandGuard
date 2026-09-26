@@ -1,7 +1,5 @@
 package pers.yufiria.landguard.data;
 
-import org.bukkit.Chunk;
-
 import java.util.UUID;
 
 /**

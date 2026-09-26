@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -22,7 +23,6 @@ import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.Roles;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -216,7 +216,7 @@ public final class GroupCommand extends CommandNode {
         }
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         GroupService.INSTANCE.invite(player.uniqueId(), groupName, target)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
@@ -385,7 +385,7 @@ public final class GroupCommand extends CommandNode {
     private void run(CommonPlayer player, CompletableFuture<GroupOpResult> future,
                      StringLangEntry successEntry, Map<String, String> formats) {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        future.whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+        future.whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
             if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                 return;
             }

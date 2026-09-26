@@ -1,17 +1,14 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
 import crypticlib.perm.PermInfo;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import pers.yufiria.landguard.claim.AutoClaimManager;
-import pers.yufiria.landguard.claim.ClaimBoundaryVisualizer;
-import pers.yufiria.landguard.claim.ClaimEngine;
-import pers.yufiria.landguard.claim.ClaimMessages;
-import pers.yufiria.landguard.claim.ClaimService;
+import pers.yufiria.landguard.claim.*;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.ChunkLoc;
@@ -20,7 +17,6 @@ import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.ConfigValues;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -79,7 +75,7 @@ public final class ClaimCommand extends CommandNode {
             bukkitPlayer.getWorld().getUID(), bukkitPlayer.getLocation().getBlockX() >> 4, bukkitPlayer.getLocation().getBlockZ() >> 4, radius);
         OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
         ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, player.name(), false)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }

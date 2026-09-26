@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.data.ChunkLoc;
-import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimChunkData;
@@ -30,9 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * TR-9.1 逻辑侧：额度买卖、个人/组银行存取、未授权取款拒绝、经济不可用降级。

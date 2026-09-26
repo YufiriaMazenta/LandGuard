@@ -12,15 +12,7 @@ import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
 import pers.yufiria.landguard.database.DataSourceManager;
 import pers.yufiria.landguard.database.SchemaMigrations;
-import pers.yufiria.landguard.database.entity.ClaimChunkData;
-import pers.yufiria.landguard.database.entity.ClaimData;
-import pers.yufiria.landguard.database.entity.ClaimRoleFlagData;
-import pers.yufiria.landguard.database.entity.ClaimSettingData;
-import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupMemberData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
-import pers.yufiria.landguard.database.entity.PlayerData;
-import pers.yufiria.landguard.database.entity.PlayerQuotaData;
+import pers.yufiria.landguard.database.entity.*;
 
 import java.sql.SQLException;
 

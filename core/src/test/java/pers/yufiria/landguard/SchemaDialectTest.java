@@ -4,14 +4,7 @@ import crypticlib.database.dialect.MysqlDialect;
 import crypticlib.database.dialect.SqliteDialect;
 import crypticlib.database.table.TableInfo;
 import org.junit.jupiter.api.Test;
-import pers.yufiria.landguard.database.entity.ClaimChunkData;
-import pers.yufiria.landguard.database.entity.ClaimData;
-import pers.yufiria.landguard.database.entity.ClaimRoleFlagData;
-import pers.yufiria.landguard.database.entity.ClaimSettingData;
-import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupMemberData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
-import pers.yufiria.landguard.database.entity.PlayerData;
+import pers.yufiria.landguard.database.entity.*;
 
 import java.util.List;
 

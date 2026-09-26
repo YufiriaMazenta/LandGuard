@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -17,7 +18,6 @@ import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Map;
@@ -108,7 +108,7 @@ public final class TransferCommand extends CommandNode {
                 return;
             }
             ClaimService.INSTANCE.transferClaim(player.uniqueId(), claimId, target)
-                .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                     if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                         return;
                     }
@@ -131,7 +131,7 @@ public final class TransferCommand extends CommandNode {
                 bukkitPlayer.getWorld().getUID(),
                 bukkitPlayer.getLocation().getBlockX() >> 4,
                 bukkitPlayer.getLocation().getBlockZ() >> 4)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }

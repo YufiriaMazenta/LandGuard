@@ -7,12 +7,7 @@ import pers.yufiria.landguard.database.entity.GroupRoleData;
 import pers.yufiria.landguard.database.entity.PlayerData;
 import pers.yufiria.landguard.owner.OwnerRef;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 全量内存数据的不可变快照。

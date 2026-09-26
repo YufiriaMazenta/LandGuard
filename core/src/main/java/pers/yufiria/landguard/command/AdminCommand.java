@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -13,11 +14,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import pers.yufiria.landguard.admin.AdminFailureReason;
-import pers.yufiria.landguard.admin.AdminOpResult;
-import pers.yufiria.landguard.admin.AdminService;
-import pers.yufiria.landguard.admin.OrphanInfo;
-import pers.yufiria.landguard.admin.OrphanService;
+import pers.yufiria.landguard.admin.*;
 import pers.yufiria.landguard.claim.ClaimEngine;
 import pers.yufiria.landguard.claim.ClaimMessages;
 import pers.yufiria.landguard.claim.ClaimService;
@@ -36,16 +33,11 @@ import pers.yufiria.landguard.upkeep.UpkeepNotifications;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.ConfigValues;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.BiConsumer;
 
 /**
@@ -131,7 +123,7 @@ public final class AdminCommand extends CommandNode {
         OwnerRef server = OwnerRef.of(BuiltinOwnerTypes.SERVER, ServerClaimOwner.ID);
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         ClaimService.INSTANCE.claim(server, bukkitPlayer.getWorld().getUID(), targets, "Admin Claim", true)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
@@ -152,7 +144,7 @@ public final class AdminCommand extends CommandNode {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         List<ChunkLoc> targets = standingTargets(player, radius);
         ClaimService.INSTANCE.adminUnclaim(targets)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }
@@ -184,7 +176,7 @@ public final class AdminCommand extends CommandNode {
         }
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         AdminService.INSTANCE.transferClaim(standing.getClaimId(), target)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null) {
                     return;
                 }
@@ -202,7 +194,7 @@ public final class AdminCommand extends CommandNode {
         String claimId = args.getFirst();
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         AdminService.INSTANCE.releaseClaim(claimId)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null) {
                     return;
                 }
@@ -230,7 +222,7 @@ public final class AdminCommand extends CommandNode {
         String claimId = standing.getClaimId();
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         AdminService.INSTANCE.setExempt(claimId, exempt)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null) {
                     return;
                 }
@@ -256,7 +248,7 @@ public final class AdminCommand extends CommandNode {
         String name = String.join(" ", args);
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         AdminService.INSTANCE.renameClaim(claimId, name)
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null) {
                     return;
                 }
@@ -328,7 +320,7 @@ public final class AdminCommand extends CommandNode {
     private void run(CommonPlayer player) {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         AdminService.INSTANCE.runMaintenance(System.currentTimeMillis())
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null) {
                     return;
                 }

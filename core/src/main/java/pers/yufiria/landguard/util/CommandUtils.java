@@ -2,6 +2,7 @@ package pers.yufiria.landguard.util;
 
 import crypticlib.BukkitPlayer;
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -30,7 +31,7 @@ public class CommandUtils {
 
     /**
      * Invoker → Bukkit 玩家：仅在必须使用 Bukkit 专有能力时调用
-     * （世界/坐标、库存、{@link Schedulers#onPlayer} 实体区域调度等）。
+     * （世界/坐标、库存、{@link CrypticLibBukkit#scheduler()} 实体区域调度等）。
      * 命令执行期间玩家必然在线，取不到属于异常状态。
      */
     public static @NotNull Player bukkitPlayer(@NotNull CommonPlayer player) {

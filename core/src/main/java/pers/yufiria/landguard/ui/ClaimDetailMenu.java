@@ -1,6 +1,5 @@
 package pers.yufiria.landguard.ui;
 
-import crypticlib.BukkitPlayer;
 import crypticlib.CommonPlayer;
 import crypticlib.CrypticLibBukkit;
 import crypticlib.conversation.Conversation;
@@ -33,7 +32,6 @@ import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -187,7 +185,7 @@ public class ClaimDetailMenu extends Menu {
         );
         OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
         ClaimService.INSTANCE.unclaim(owner, List.of(standing))
-            .whenComplete((result, throwable) -> Schedulers.onPlayer(player, () -> {
+            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
                 if (!player.isOnline() || throwable != null || result == null) {
                     return;
                 }
@@ -229,7 +227,7 @@ public class ClaimDetailMenu extends Menu {
                 return;
             }
             ClaimService.INSTANCE.renameClaim(player.getUniqueId(), claimId, raw)
-                .whenComplete((result, throwable) -> Schedulers.onPlayer(player, () -> {
+                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
                     if (!player.isOnline() || throwable != null || result == null) {
                         return;
                     }

@@ -1,10 +1,8 @@
 package pers.yufiria.landguard.claim;
 
-import crypticlib.BukkitPlayer;
 import crypticlib.CommonPlayer;
 import crypticlib.CrypticLibBukkit;
 import crypticlib.listener.EventListener;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -13,7 +11,6 @@ import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.util.CommandUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Set;
@@ -77,7 +74,7 @@ public enum AutoClaimManager implements Listener {
                 if (throwable != null || result == null) {
                     return;
                 }
-                Schedulers.onPlayer(bukkitPlayer, () -> {
+                CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                     if (!bukkitPlayer.isOnline()) {
                         return;
                     }

@@ -9,11 +9,7 @@ import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerProvider;
 import pers.yufiria.landguard.owner.OwnerType;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 内置 {@code group} 类型提供方。与 player 提供方、第三方提供方地位对等，

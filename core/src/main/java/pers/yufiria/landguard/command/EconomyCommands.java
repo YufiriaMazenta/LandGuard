@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
+import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -13,7 +14,6 @@ import pers.yufiria.landguard.economy.EconomyFailureReason;
 import pers.yufiria.landguard.economy.EconomyService;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.List;
 import java.util.Locale;
@@ -73,7 +73,7 @@ public final class EconomyCommands {
                 return;
             }
             EconomyService.INSTANCE.buyChunks(player.uniqueId(), chunks)
-                .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                     if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                         return;
                     }
@@ -120,7 +120,7 @@ public final class EconomyCommands {
                 return;
             }
             EconomyService.INSTANCE.sellChunks(player.uniqueId(), chunks)
-                .whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                     if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                         return;
                     }
@@ -194,7 +194,7 @@ public final class EconomyCommands {
             var future = deposit
                 ? EconomyService.INSTANCE.deposit(player.uniqueId(), world, cx, cz, amount)
                 : EconomyService.INSTANCE.withdraw(player.uniqueId(), world, cx, cz, amount);
-            future.whenComplete((result, throwable) -> Schedulers.onPlayer(bukkitPlayer, () -> {
+            future.whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
                 if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
                     return;
                 }

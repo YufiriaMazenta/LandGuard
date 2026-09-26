@@ -2,11 +2,7 @@ package pers.yufiria.landguard.database;
 
 import crypticlib.database.connection.ConnectionSource;
 
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;

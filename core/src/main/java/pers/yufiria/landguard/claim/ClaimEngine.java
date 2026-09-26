@@ -7,15 +7,7 @@ import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.owner.OwnerRef;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * 纯函数认领规则引擎：只读快照、零 Bukkit/DAO 依赖，可直接单元测试。

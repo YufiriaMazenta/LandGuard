@@ -21,12 +21,7 @@ import pers.yufiria.landguard.protection.ProtectionFlag;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 /**
  * GUI 公共工具：语言文本替换、通用图标、玩家名/脚下领地解析、flag 展示元数据。

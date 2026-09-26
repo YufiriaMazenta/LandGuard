@@ -6,22 +6,13 @@ import crypticlib.database.dao.DaoManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
-import pers.yufiria.landguard.database.entity.ClaimChunkData;
-import pers.yufiria.landguard.database.entity.ClaimData;
-import pers.yufiria.landguard.database.entity.ClaimRoleFlagData;
-import pers.yufiria.landguard.database.entity.ClaimSettingData;
-import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupMemberData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
-import pers.yufiria.landguard.database.entity.PlayerData;
+import pers.yufiria.landguard.database.entity.*;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * AC-13: SQLite 持久化与“重启恢复”。

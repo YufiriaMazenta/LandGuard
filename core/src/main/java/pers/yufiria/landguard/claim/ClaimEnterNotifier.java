@@ -26,11 +26,7 @@ import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.ConfigValues;
 import pers.yufiria.landguard.util.LangUtils;
 
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**

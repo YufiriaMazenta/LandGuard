@@ -1,20 +1,16 @@
 package pers.yufiria.landguard;
 
-import crypticlib.BukkitPlugin;
-import crypticlib.CrypticLib;
-import crypticlib.CrypticLibBukkit;
-import crypticlib.CrypticLibPlugin;
-import crypticlib.MinecraftVersion;
+import crypticlib.*;
 import crypticlib.chat.BukkitMsgSender;
 import crypticlib.lifecycle.LifecyclePhase;
 import crypticlib.lifecycle.LifecycleSchedule;
 import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
+import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.config.PluginConfigs;
 import pers.yufiria.landguard.exception.UnsupportedVersionException;
 import pers.yufiria.landguard.metrics.MetricsManager;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.config.Languages;
 
 @LifecycleTaskConfig(
     schedules = {

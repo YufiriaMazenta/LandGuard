@@ -2,11 +2,11 @@ package pers.yufiria.landguard.protection.listener;
 
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.protection.BlockPoint;
 import pers.yufiria.landguard.protection.CheckResult;
 import pers.yufiria.landguard.protection.ProtectionFlag;
 import pers.yufiria.landguard.protection.ProtectionQueries;
-import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.util.LangUtils;
 
 /**

@@ -23,7 +23,6 @@ import pers.yufiria.landguard.protection.FlagService;
 import pers.yufiria.landguard.protection.ProtectionChecker;
 import pers.yufiria.landguard.protection.ProtectionFlag;
 import pers.yufiria.landguard.util.LangUtils;
-import pers.yufiria.landguard.util.Schedulers;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -197,7 +196,7 @@ public class FlagListMenu extends Menu {
                 ? FlagService.INSTANCE.resetBehaviorOverride(claimId, roleId, flag)
                 : FlagService.INSTANCE.setBehaviorOverride(claimId, roleId, flag, next);
         }
-        future.whenComplete((ok, throwable) -> Schedulers.onPlayer(player, () -> {
+        future.whenComplete((ok, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
             if (!player.isOnline() || throwable != null) {
                 return;
             }
