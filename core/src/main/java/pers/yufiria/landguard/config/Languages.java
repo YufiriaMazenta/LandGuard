@@ -28,9 +28,13 @@ public class Languages {
     public static final StringLangEntry COMMAND_CLAIM_RADIUS_TOO_LARGE = new StringLangEntry("command.claim.radius_too_large");
     public static final StringLangEntry COMMAND_CLAIM_AUTO_ON = new StringLangEntry("command.claim.auto_on");
     public static final StringLangEntry COMMAND_CLAIM_AUTO_OFF = new StringLangEntry("command.claim.auto_off");
+    public static final StringLangEntry COMMAND_CLAIM_SKIPPED = new StringLangEntry("command.claim.skipped");
     public static final StringLangEntry COMMAND_BOUNDARY_ON = new StringLangEntry("command.boundary.on");
     public static final StringLangEntry COMMAND_BOUNDARY_OFF = new StringLangEntry("command.boundary.off");
     public static final StringLangEntry COMMAND_UNCLAIM_SUCCESS = new StringLangEntry("command.unclaim.success");
+    public static final StringLangEntry COMMAND_UNCLAIM_USAGE = new StringLangEntry("command.unclaim.usage");
+    public static final StringLangEntry COMMAND_UNCLAIM_AUTO_ON = new StringLangEntry("command.unclaim.auto_on");
+    public static final StringLangEntry COMMAND_UNCLAIM_AUTO_OFF = new StringLangEntry("command.unclaim.auto_off");
     public static final StringLangEntry COMMAND_LIST_HEADER = new StringLangEntry("command.list.header");
     public static final StringLangEntry COMMAND_LIST_ENTRY = new StringLangEntry("command.list.entry");
     public static final StringLangEntry COMMAND_LIST_EMPTY = new StringLangEntry("command.list.empty");

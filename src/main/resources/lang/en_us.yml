@@ -13,11 +13,15 @@ command:
     radius_too_large: '<prefix> &cRadius exceeds the limit, maximum is <max>'
     auto_on: '<prefix> &aWalk auto-claim enabled: entering new chunks will claim them automatically'
     auto_off: '<prefix> &eWalk auto-claim disabled'
+    skipped: '<prefix> &eSkipped &f<count>&e chunk(s) that are already claimed'
   boundary:
     on: '<prefix> &aClaim boundary rendering enabled; a particle outline will show when you enter a claim'
     off: '<prefix> &eClaim boundary rendering disabled'
   unclaim:
     success: '<prefix> &eReleased &f<count>&e chunk(s), refunded &f<refunded>&e quota. Remaining quota: &f<available>'
+    usage: '<prefix> &eUsage: &f/land unclaim&7 (release the standing chunk)&e, &f/land unclaim auto&7 (toggle walk auto-unclaim)'
+    auto_on: '<prefix> &aWalk auto-unclaim enabled: entering your own claim (or a group claim you lead) will release that chunk (walk auto-claim disabled)'
+    auto_off: '<prefix> &eWalk auto-unclaim disabled'
   list:
     header: '<prefix> &aYour claims (<size>):'
     entry: '&8- &f<name> &7[<world>] &7chunks: &f<chunks>'
@@ -213,7 +217,7 @@ menu:
     bank_name: '&6Claim bank'
     bank_lore: '&7View balance and deposit/withdraw funds'
     unclaim_name: '&cUnclaim the chunk under you'
-    unclaim_lore: '&7Same as &f/land unclaim&7; only your own claims'
+    unclaim_lore: '&7Same as &f/land unclaim&7; releases your own claims and group claims you lead'
     rename_name: '&dRename claim'
     rename_lore: '&7Type the new claim name in chat'
     rename_prompt: '<prefix> &eType the new claim name in chat, or &fcancel &eto abort'

@@ -8,7 +8,7 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
 
 ## Features
 
-- **Pure chunk claims**: claim, unclaim, radius batch, walk-to-auto-claim, particle boundary visualization
+- **Pure chunk claims**: claim, unclaim (your own claims and groups you lead), radius batch (skips chunks that are already claimed), walk-to-auto-claim / auto-unclaim, particle boundary visualization
 - **Entry notices**: configurable action bar or chat message when you step into a claim, plus particle boundary rendering (with both a server-level and a per-player toggle)
 - **Organization-first**: built-in groups (invites / roles / transfer / claim gifting) plus an open ownership SPI for third-party organization systems
 - **Role × flag model**: owner / manager / member / visitor and custom roles, each with independently configurable behavioral and natural protection flags
@@ -38,8 +38,8 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
 | Command | Description |
 |---|---|
 | `/land` | Open the claims GUI |
-| `/land claim [radius <r> \| auto]` | Claim the standing chunk / square batch / toggle walk auto-claim |
-| `/land unclaim` | Unclaim the standing chunk |
+| `/land claim [radius <r> \| auto]` | Claim the standing chunk / square batch / toggle walk auto-claim (batches skip chunks that are already claimed) |
+| `/land unclaim [auto]` | Unclaim the standing chunk / toggle walk auto-unclaim (your own claims and groups you lead; other members cannot unclaim group claims) |
 | `/land list` | List your claims |
 | `/land info` | Information about the claim you stand on |
 | `/land boundary` | Toggle particle boundary rendering on claim entry (per player, on by default) |

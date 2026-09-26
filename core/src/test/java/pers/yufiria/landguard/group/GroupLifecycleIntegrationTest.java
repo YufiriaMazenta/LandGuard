@@ -228,6 +228,37 @@ public class GroupLifecycleIntegrationTest {
         assertEquals(16, ok.availableChunks());
     }
 
+    @Test
+    void groupLeaderCanUnclaimOwnClaimButMembersCannot() throws Exception {
+        String groupId = createGuild();
+        assertTrue(GroupService.INSTANCE.invite(ALICE, "Guild", BOB).join().success());
+        assertTrue(GroupService.INSTANCE.acceptInvite(BOB, "Guild").join().success());
+        placeGroupClaim(groupId, 5, 5);
+
+        ChunkLoc target = ChunkLoc.of(world, 5, 5);
+
+        // 普通成员不是领地真实所有者：被拒且区块保留
+        ClaimOpResult denied = ClaimService.INSTANCE.unclaimOwnedBy(BOB, target).join();
+        assertFalse(denied.success());
+        assertEquals(ClaimFailureReason.NOT_OWNER, denied.failureReason());
+        assertTrue(DataStore.INSTANCE.snapshot().claimIdByChunk().containsKey(target));
+
+        // 野外（无领主）同样是 NOT_CLAIMED
+        assertEquals(ClaimFailureReason.NOT_CLAIMED,
+            ClaimService.INSTANCE.unclaimOwnedBy(ALICE, ChunkLoc.of(world, 9, 9)).join().failureReason());
+
+        // 领袖自助放弃：区块消失，最后一块放弃后整领随 flag/设置删除，额度按组容量展示
+        ClaimOpResult done = ClaimService.INSTANCE.unclaimOwnedBy(ALICE, target).join();
+        assertTrue(done.success());
+        assertEquals(1, done.affectedChunks());
+        assertEquals(0, done.refundedChunks(), "组领地放弃不结算个人额度返还");
+        assertEquals(GroupService.INSTANCE.groupCapacity(DataStore.INSTANCE.snapshot(), groupId),
+            done.availableChunks());
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        assertFalse(snapshot.claimIdByChunk().containsKey(target));
+        assertTrue(snapshot.claimsById().isEmpty());
+    }
+
     private static List<ChunkLoc> square(UUID worldUuid, int size) {
         List<ChunkLoc> result = new ArrayList<>(size * size);
         for (int x = 0; x < size; x++) {

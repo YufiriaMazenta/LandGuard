@@ -19,6 +19,16 @@ public final class ClaimMessages {
             "<count>", String.valueOf(result.affectedChunks()),
             "<available>", formatAvailable(result.availableChunks())
         ));
+        claimSkipped(player, result.skippedChunks());
+    }
+
+    /** 批量认领中被跳过的已占用区块数量；没有跳过时不发送。 */
+    public static void claimSkipped(Invoker player, int skipped) {
+        if (skipped <= 0) {
+            return;
+        }
+        LangUtils.sendLang(player, Languages.COMMAND_CLAIM_SKIPPED,
+            Map.of("<count>", String.valueOf(skipped)));
     }
 
     public static void unclaimSuccess(Invoker player, ClaimOpResult result) {

@@ -130,6 +130,7 @@ public final class AdminCommand extends CommandNode {
                 if (result.success()) {
                     LangUtils.sendLang(player, Languages.COMMAND_ADMIN_CLAIM_SUCCESS,
                         Map.of("<count>", String.valueOf(result.affectedChunks())));
+                    ClaimMessages.claimSkipped(player, result.skippedChunks());
                 } else {
                     ClaimMessages.failure(player, result.failureReason());
                 }

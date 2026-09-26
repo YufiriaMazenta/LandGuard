@@ -26,7 +26,6 @@ import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.economy.EconomyService;
-import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
@@ -183,8 +182,7 @@ public class ClaimDetailMenu extends Menu {
             player.getLocation().getBlockX() >> 4,
             player.getLocation().getBlockZ() >> 4
         );
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
-        ClaimService.INSTANCE.unclaim(owner, List.of(standing))
+        ClaimService.INSTANCE.unclaimOwnedBy(player.getUniqueId(), standing)
             .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
                 if (!player.isOnline() || throwable != null || result == null) {
                     return;

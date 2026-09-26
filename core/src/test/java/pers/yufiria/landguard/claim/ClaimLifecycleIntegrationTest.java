@@ -172,6 +172,31 @@ public class ClaimLifecycleIntegrationTest {
         assertEquals(9, DataStore.INSTANCE.snapshot().claimIdByChunk().size());
     }
 
+    @Test
+    void batchClaimSkipsAlreadyClaimedChunks() throws Exception {
+        // A 先拥有 (0,0)
+        assertTrue(ClaimService.INSTANCE.claim(ownerA, world, List.of(loc(0, 0)), "home", false).join().success());
+
+        // 再认领以 (0,0) 为中心的 3x3：中心已被占用被跳过，其余 8 块与已有领地相邻，扩容成功
+        List<ChunkLoc> nine = ClaimEngine.radiusTargets(world, 0, 0, 2);
+        ClaimOpResult batch = ClaimService.INSTANCE.claim(ownerA, world, nine, "home", false).join();
+        assertTrue(batch.success());
+        assertEquals(8, batch.affectedChunks());
+        assertEquals(1, batch.skippedChunks());
+        assertEquals(1, batch.availableChunks());
+        DataSnapshot snap = DataStore.INSTANCE.snapshot();
+        assertEquals(9, snap.claimIdByChunk().size());
+        assertEquals(9, LandDaoManager.INSTANCE.claimChunkDao().queryForAll().size());
+        // 同一领地承载，未新建第二块地
+        assertEquals(1, snap.claimsByOwner().get(ownerA).size());
+
+        // 全部目标都已被占用 → OVERLAP，且不产生任何写入
+        ClaimOpResult allClaimed = ClaimService.INSTANCE.claim(ownerA, world, nine, "home", false).join();
+        assertEquals(ClaimFailureReason.OVERLAP, allClaimed.failureReason());
+        assertEquals(9, DataStore.INSTANCE.snapshot().claimIdByChunk().size());
+        assertEquals(9, LandDaoManager.INSTANCE.claimChunkDao().queryForAll().size());
+    }
+
     private static ChunkLoc loc(int x, int z) {
         return ChunkLoc.of(world, x, z);
     }

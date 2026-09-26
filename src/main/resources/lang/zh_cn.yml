@@ -13,11 +13,15 @@ command:
     radius_too_large: '<prefix> &c半径超出上限，最大为 <max>'
     auto_on: '<prefix> &a已开启行走自动认领，进入新区块时将自动尝试认领'
     auto_off: '<prefix> &e已关闭行走自动认领'
+    skipped: '<prefix> &e已跳过 <count> 个已被认领的区块'
   boundary:
     on: '<prefix> &a已开启领地边界渲染，进入领地时会显示粒子边界'
     off: '<prefix> &e已关闭领地边界渲染'
   unclaim:
     success: '<prefix> &e已放弃 &f<count>&e 个区块，返还额度 &f<refunded>&e，剩余额度：&f<available>'
+    usage: '<prefix> &e用法：&f/land unclaim&7（放弃脚下区块）&e，&f/land unclaim auto&7（切换行走自动放弃）'
+    auto_on: '<prefix> &a已开启行走自动放弃，进入自己的领地（含本人领袖的组领地）时会自动放弃该区块（行走自动认领已关闭）'
+    auto_off: '<prefix> &e已关闭行走自动放弃'
   list:
     header: '<prefix> &a你的领地（共 <size> 个）：'
     entry: '&8- &f<name> &7[<world>] &7区块数: &f<chunks>'
@@ -213,7 +217,7 @@ menu:
     bank_name: '&6领地银行'
     bank_lore: '&7查看余额并存取资金'
     unclaim_name: '&c放弃脚下区块'
-    unclaim_lore: '&7等价于 &f/land unclaim&7，只能放弃你自己的领地'
+    unclaim_lore: '&7等价于 &f/land unclaim&7，可放弃本人领地与本人领袖的组领地'
     rename_name: '&d重命名领地'
     rename_lore: '&7在聊天中输入新的领地名字'
     rename_prompt: '<prefix> &e请在聊天中输入新的领地名字，输入 &fcancel &e取消'

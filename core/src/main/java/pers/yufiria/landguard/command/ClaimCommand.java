@@ -39,8 +39,11 @@ public final class ClaimCommand extends CommandNode {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
 
         if (!args.isEmpty() && args.get(0).equalsIgnoreCase("auto")) {
-            boolean enabled = AutoClaimManager.INSTANCE.toggle(player.uniqueId());
-            LangUtils.sendLang(player, enabled ? Languages.COMMAND_CLAIM_AUTO_ON : Languages.COMMAND_CLAIM_AUTO_OFF);
+            AutoModeManager.Mode mode = AutoModeManager.INSTANCE.toggle(
+                player.uniqueId(), AutoModeManager.Mode.CLAIM);
+            LangUtils.sendLang(player, mode == AutoModeManager.Mode.CLAIM
+                ? Languages.COMMAND_CLAIM_AUTO_ON
+                : Languages.COMMAND_CLAIM_AUTO_OFF);
             return;
         }
 

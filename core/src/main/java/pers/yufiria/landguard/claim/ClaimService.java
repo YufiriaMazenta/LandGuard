@@ -38,6 +38,8 @@ public enum ClaimService {
 
     /**
      * 认领一批区块（首个领地自动创建，同世界已有领地则扩容到该领地）。
+     * 已属于任何领地（含操作者本人）的目标区块会被跳过，只认领剩余部分；
+     * 若全部目标都已被占用，则按 {@link ClaimFailureReason#OVERLAP} 失败。
      *
      * @param defaultName 新建领地的默认名称（调用方在主线程用玩家名生成）
      * @param admin       管理领地（server 虚拟所有者）：跳过相邻与额度限制
@@ -50,9 +52,21 @@ public enum ClaimService {
             : owner;
         AtomicReference<ClaimOpResult> resultRef = new AtomicReference<>();
         return DataStore.INSTANCE.mutate(current -> {
-            List<ChunkLoc> targets = ClaimEngine.normalizeTargets(world, rawTargets);
-            if (targets == null) {
+            List<ChunkLoc> raw = ClaimEngine.normalizeTargets(world, rawTargets);
+            if (raw == null) {
                 resultRef.set(ClaimOpResult.failed(ClaimFailureReason.INVALID_TARGETS));
+                return current;
+            }
+            // 已被占用的区块（无论归属谁）在本批次内跳过，只对剩余区块做校验与落库
+            List<ChunkLoc> targets = new ArrayList<>(raw.size());
+            for (ChunkLoc target : raw) {
+                if (!current.claimIdByChunk().containsKey(target)) {
+                    targets.add(target);
+                }
+            }
+            int skipped = raw.size() - targets.size();
+            if (targets.isEmpty()) {
+                resultRef.set(ClaimOpResult.failed(ClaimFailureReason.OVERLAP));
                 return current;
             }
             Set<ChunkLoc> owned = ClaimEngine.ownedChunksInWorld(current, effectiveOwner, world);
@@ -124,7 +138,7 @@ public enum ClaimService {
             } else {
                 available = UNLIMITED;
             }
-            resultRef.set(ClaimOpResult.claimed(claimId, targets.size(), available));
+            resultRef.set(ClaimOpResult.claimed(claimId, targets.size(), skipped, available));
             return next;
         }).thenApply(snapshot -> resultRef.get());
     }
@@ -196,11 +210,38 @@ public enum ClaimService {
             }
 
             DataSnapshot next = DataStore.rebuildSnapshot();
-            long available = playerUuid == null ? UNLIMITED : availableChunks(playerUuid, next);
+            long available;
+            if (playerUuid != null) {
+                available = availableChunks(playerUuid, next);
+            } else if (owner.typeKey().equals(BuiltinOwnerTypes.GROUP)) {
+                available = Math.max(0L,
+                    GroupService.INSTANCE.groupCapacity(next, owner.identifier())
+                        - ClaimEngine.currentClaimedChunks(next, owner));
+            } else {
+                available = UNLIMITED;
+            }
             String claimId = byClaim.size() == 1 ? byClaim.keySet().iterator().next() : null;
             resultRef.set(ClaimOpResult.unclaimed(claimId, targets.size(), refunded, available));
             return next;
         }).thenApply(snapshot -> resultRef.get());
+    }
+
+    /**
+     * 玩家自助放弃单个区块：授权按「领地真实所有者 + 操作者在其中的角色」判定
+     * （个人领地＝本人，用户组领地＝组内 {@link Roles#OWNER}），因此组领袖可直接放弃组领地。
+     * 授权用已发布快照在进入写线程前判定，写线程内仍由 {@link #unclaim} 复核归属，避免竞态。
+     */
+    public CompletableFuture<ClaimOpResult> unclaimOwnedBy(UUID actor, ChunkLoc target) {
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        String claimId = snapshot.claimIdByChunk().get(target);
+        ClaimData claim = claimId == null ? null : snapshot.claimsById().get(claimId);
+        if (claim == null) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
+        }
+        if (!isOwner(claim, actor)) {
+            return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_OWNER));
+        }
+        return unclaim(OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()), List.of(target));
     }
 
     /**
