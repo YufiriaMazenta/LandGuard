@@ -13,10 +13,7 @@ repositories {
 
 dependencies {
     implementation(project(":core"))
-    //hook与nms模块全部打入最终jar, 新nms模块只需include进settings.gradle.kts
-    rootProject.subprojects
-        .filter { it.path == ":hook" || it.path.startsWith(":nms:") }
-        .forEach { implementation(project(it.path)) }
+    implementation(project(":hook"))
     implementation("com.crypticlib:bukkit:${rootProject.findProperty("crypticlibVer")}")
 }
 

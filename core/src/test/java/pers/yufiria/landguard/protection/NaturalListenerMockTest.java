@@ -160,6 +160,7 @@ public class NaturalListenerMockTest {
     }
 
     @Test
+    @SuppressWarnings("removal")
     void fireSpreadAndTrampleBlocked() {
         Block source = world.getBlockAt(31, 65, 0);
         source.setType(Material.FIRE);
