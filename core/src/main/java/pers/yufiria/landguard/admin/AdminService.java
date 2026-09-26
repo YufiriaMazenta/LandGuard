@@ -1,22 +1,20 @@
 package pers.yufiria.landguard.admin;
 
-import pers.yufiria.landguard.claim.ClaimEngine;
 import pers.yufiria.landguard.claim.ClaimRelease;
 import pers.yufiria.landguard.claim.ClaimService;
+import pers.yufiria.landguard.claim.PlayerQuotaLedger;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotPart;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.PlayerData;
-import pers.yufiria.landguard.database.entity.PlayerQuotaData;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
-import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.upkeep.UpkeepCycleResult;
 import pers.yufiria.landguard.upkeep.UpkeepService;
 import pers.yufiria.landguard.util.ConfigValues;
 
-import java.sql.SQLException;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -48,7 +46,12 @@ public enum AdminService {
             }
             found.set(true);
             chunksRef.set(released.chunks());
-            return DataStore.rebuildSnapshot();
+            // 该领地的区块、flag、设置与领地行全部被删，按领地范围重读
+            DataSnapshot next = DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
+            next = DataStore.reloadScoped(SnapshotPart.CLAIM_CHUNK, claimId);
+            next = DataStore.reloadScoped(SnapshotPart.ROLE_FLAG, claimId);
+            next = DataStore.reloadScoped(SnapshotPart.CLAIM_SETTING, claimId);
+            return next;
         }).thenApply(next -> found.get()
             ? AdminOpResult.ok(claimId, chunksRef.get())
             : AdminOpResult.failed(AdminFailureReason.CLAIM_NOT_FOUND));
@@ -83,34 +86,26 @@ public enum AdminService {
                 daos.playerDao().create(targetData);
             }
 
-            ClaimData transferred = new ClaimData(
-                claim.getClaimId(), claim.getWorldUuid(),
-                BuiltinOwnerTypes.PLAYER, target.toString(),
-                claim.getName(), false,
-                claim.getCreatedAt(), now,
-                claim.getBankBalance(), false,
-                0L, 0L, 0L, 0L
-            );
+            // 生命周期时间戳全部归零：转让后重新开始计费与活跃判定
+            ClaimData transferred = ClaimData.builder(
+                    claim.getClaimId(), claim.getWorldUuid(), BuiltinOwnerTypes.PLAYER, target.toString(),
+                    claim.getName())
+                .createdAt(claim.getCreatedAt())
+                .lastActiveAt(now)
+                .bankBalance(claim.getBankBalance())
+                .build();
             daos.claimDao().update(transferred);
 
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 领地行换了所有者，且转让目标可能新建了玩家行
+            DataSnapshot next = DataStore.reload(SnapshotPart.PLAYER);
+            next = DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
             // 新所有者：额度已用至少要覆盖实际持有（允许超出容量，不拒绝管理操作）
-            OwnerRef targetRef = OwnerRef.of(BuiltinOwnerTypes.PLAYER, target.toString());
-            PlayerQuotaData targetQuota = loadOrCreateQuota(daos, target);
-            int targetActual = ClaimEngine.currentClaimedChunks(next, targetRef);
-            targetQuota.setUsedChunks(Math.max(targetQuota.getUsedChunks(), targetActual));
-            daos.playerQuotaDao().update(targetQuota);
+            PlayerQuotaLedger.raiseToActual(target, next);
             // 原个人所有者：额度按剩余实际持有量校正
             if (BuiltinOwnerTypes.PLAYER.equals(oldOwnerType) && !oldOwnerId.equals(target.toString())) {
                 UUID oldUuid = parseUuid(oldOwnerId);
                 if (oldUuid != null) {
-                    PlayerQuotaData oldQuota = daos.playerQuotaDao().queryForId(oldUuid);
-                    if (oldQuota != null) {
-                        int oldActual = ClaimEngine.currentClaimedChunks(
-                            next, OwnerRef.of(BuiltinOwnerTypes.PLAYER, oldOwnerId));
-                        oldQuota.setUsedChunks(Math.max(oldActual, 0));
-                        daos.playerQuotaDao().update(oldQuota);
-                    }
+                    PlayerQuotaLedger.trimToActual(oldUuid, next);
                 }
             }
             return next;
@@ -156,7 +151,7 @@ public enum AdminService {
             claim.setName(name);
             LandDaoManager.INSTANCE.claimDao().update(claim);
             found.set(true);
-            return DataStore.rebuildSnapshot();
+            return DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
         }).thenApply(next -> found.get()
             ? AdminOpResult.ok(claimId, 0)
             : AdminOpResult.failed(AdminFailureReason.CLAIM_NOT_FOUND));
@@ -169,15 +164,6 @@ public enum AdminService {
         return UpkeepService.INSTANCE.runCycle(now)
             .thenCompose(upkeepResult -> OrphanService.INSTANCE.runCycle(now)
                 .thenApply(orphanResult -> UpkeepCycleResult.merge(upkeepResult, orphanResult)));
-    }
-
-    private static PlayerQuotaData loadOrCreateQuota(LandDaoManager daos, UUID uuid) throws SQLException {
-        PlayerQuotaData quota = daos.playerQuotaDao().queryForId(uuid);
-        if (quota == null) {
-            quota = new PlayerQuotaData(uuid, 0);
-            daos.playerQuotaDao().create(quota);
-        }
-        return quota;
     }
 
     private static UUID parseUuid(String value) {

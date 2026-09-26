@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -13,6 +12,7 @@ import pers.yufiria.landguard.claim.ClaimMessages;
 import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.ChunkLoc;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -52,17 +52,13 @@ public final class UnclaimCommand extends CommandNode {
             bukkitPlayer.getLocation().getBlockX() >> 4,
             bukkitPlayer.getLocation().getBlockZ() >> 4
         );
-        ClaimService.INSTANCE.unclaimOwnedBy(player.uniqueId(), standing)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
-                }
-                if (result.success()) {
-                    ClaimMessages.unclaimSuccess(player, result);
-                } else {
-                    ClaimMessages.failure(player, result.failureReason());
-                }
-            }));
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.unclaimOwnedBy(player.uniqueId(), standing), result -> {
+            if (result.success()) {
+                ClaimMessages.unclaimSuccess(player, result);
+            } else {
+                ClaimMessages.failure(player, result.failureReason());
+            }
+        });
     }
 
     @Override

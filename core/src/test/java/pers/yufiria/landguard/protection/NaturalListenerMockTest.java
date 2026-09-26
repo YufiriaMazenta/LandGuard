@@ -27,7 +27,6 @@ import pers.yufiria.landguard.protection.listener.BlockProtectionListener;
 import pers.yufiria.landguard.protection.listener.EntityProtectionListener;
 import pers.yufiria.landguard.protection.listener.NaturalProtectionListener;
 
-import java.lang.reflect.Field;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -59,7 +58,7 @@ public class NaturalListenerMockTest {
         register(pm, NaturalProtectionListener.INSTANCE);
         register(pm, BlockProtectionListener.INSTANCE);
         register(pm, EntityProtectionListener.INSTANCE);
-        publishSnapshot(snapshotWithClaims());
+        DataStore.INSTANCE.publish(snapshotWithClaims());
     }
 
     private void register(PluginManager pm, Listener listener) {
@@ -73,14 +72,8 @@ public class NaturalListenerMockTest {
             HandlerList.unregisterAll((Listener) listener);
         }
         registeredListeners.clear();
-        publishSnapshot(DataSnapshot.empty());
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
         MockBukkit.unmock();
-    }
-
-    private static void publishSnapshot(DataSnapshot snapshot) throws Exception {
-        Field field = DataStore.class.getDeclaredField("snapshot");
-        field.setAccessible(true);
-        field.set(DataStore.INSTANCE, snapshot);
     }
 
     private DataSnapshot snapshotWithClaims() {

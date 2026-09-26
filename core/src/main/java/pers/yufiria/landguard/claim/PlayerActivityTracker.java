@@ -15,6 +15,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.util.ConfigValues;
 
@@ -29,8 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @EventListener
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = 2),
-        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = 2),
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = LifecycleOrder.PLUGIN),
+        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = LifecycleOrder.PLUGIN),
         @LifecycleSchedule(phase = LifecyclePhase.DISABLE)
     }
 )

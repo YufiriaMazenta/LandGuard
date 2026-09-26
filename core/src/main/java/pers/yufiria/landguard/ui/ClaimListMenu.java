@@ -1,6 +1,5 @@
 package pers.yufiria.landguard.ui;
 
-import crypticlib.CrypticLibBukkit;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.MenuDisplay;
 import crypticlib.ui.display.MenuLayout;
@@ -24,6 +23,7 @@ import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 
 import java.util.*;
@@ -122,19 +122,15 @@ public class ClaimListMenu extends Menu {
             1
         );
         OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.getUniqueId().toString());
-        ClaimService.INSTANCE.claim(owner, player.getWorld().getUID(), targets, player.getName(), false)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
-                if (!player.isOnline() || throwable != null || result == null) {
-                    return;
-                }
-                if (result.success()) {
-                    ClaimBoundaryVisualizer.show(player, targets);
-                    ClaimMessages.claimSuccess(CommandUtils.commonPlayer(player), result);
-                } else {
-                    ClaimMessages.failure(CommandUtils.commonPlayer(player), result.failureReason());
-                }
-                refresh();
-            }));
+        AsyncReply.toPlayer(player, ClaimService.INSTANCE.claim(owner, player.getWorld().getUID(), targets, player.getName(), false), result -> {
+            if (result.success()) {
+                ClaimBoundaryVisualizer.show(player, targets);
+                ClaimMessages.claimSuccess(CommandUtils.commonPlayer(player), result);
+            } else {
+                ClaimMessages.failure(CommandUtils.commonPlayer(player), result.failureReason());
+            }
+            refresh();
+        });
     }
 
     @Override

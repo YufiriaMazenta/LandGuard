@@ -58,7 +58,8 @@ public class ProtectionHotPathBenchmarkTest {
             for (int z = 0; z < GRID; z++) {
                 String claimId = "c-" + x + "-" + z;
                 String ownerId = "town-" + x + "-" + z;
-                ClaimData claim = new ClaimData(claimId, WORLD, BENCH_TYPE.key(), ownerId, claimId, false, now, now, 0D, false);
+                ClaimData claim = ClaimData.builder(claimId, WORLD, BENCH_TYPE.key(), ownerId, claimId)
+                    .createdAt(now).lastActiveAt(now).build();
                 byId.put(claimId, claim);
                 ChunkLoc loc = ChunkLoc.of(WORLD, x, z);
                 byChunk.put(loc, claimId);

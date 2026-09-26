@@ -3,9 +3,7 @@ package pers.yufiria.landguard.claim;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimData;
-import pers.yufiria.landguard.database.entity.PlayerQuotaData;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
-import pers.yufiria.landguard.owner.OwnerRef;
 
 import java.sql.SQLException;
 import java.util.Set;
@@ -66,28 +64,20 @@ public final class ClaimRelease {
         daos.claimDao().delete(claim);
 
         if (BuiltinOwnerTypes.PLAYER.equals(claim.getOwnerType())) {
-            refundQuota(daos, snapshot, claim, chunks);
+            refundQuota(snapshot, claim, chunks);
         }
         return new Released(claim, chunks);
     }
 
-    private static void refundQuota(LandDaoManager daos, DataSnapshot snapshot, ClaimData claim, int releasedChunks)
-        throws SQLException {
+    private static void refundQuota(DataSnapshot snapshot, ClaimData claim, int releasedChunks) throws SQLException {
         UUID uuid;
         try {
             uuid = UUID.fromString(claim.getOwnerId());
         } catch (IllegalArgumentException e) {
             return;
         }
-        PlayerQuotaData quota = daos.playerQuotaDao().queryForId(uuid);
-        if (quota == null) {
-            return;
-        }
-        int remainingActual = Math.max(0,
-            ClaimEngine.currentClaimedChunks(snapshot, OwnerRef.of(BuiltinOwnerTypes.PLAYER, uuid.toString()))
-                - releasedChunks);
-        quota.setUsedChunks(Math.max(remainingActual, Math.max(0, quota.getUsedChunks() - releasedChunks)));
-        daos.playerQuotaDao().update(quota);
+        // 系统回收：被释放区块的额度全额退回，超出实际持有的历史消耗保留
+        PlayerQuotaLedger.refund(uuid, snapshot, releasedChunks, releasedChunks);
     }
 
 }

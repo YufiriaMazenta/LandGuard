@@ -8,6 +8,7 @@ import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
 import crypticlib.scheduler.CrypticLibRunnable;
 import org.jetbrains.annotations.Nullable;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.api.event.EventCaller;
 import pers.yufiria.landguard.api.event.OwnerMembershipChangedEvent;
 import pers.yufiria.landguard.config.PluginConfigs;
@@ -21,8 +22,8 @@ import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwnerProvider;
  */
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = 1),
-        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = 1),
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = LifecycleOrder.REGISTRY),
+        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = LifecycleOrder.REGISTRY),
         @LifecycleSchedule(phase = LifecyclePhase.DISABLE)
     }
 )

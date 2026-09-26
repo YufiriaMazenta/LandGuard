@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -12,6 +11,7 @@ import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.economy.EconomyFailureReason;
 import pers.yufiria.landguard.economy.EconomyService;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -72,20 +72,16 @@ public final class EconomyCommands {
             if (chunks == null) {
                 return;
             }
-            EconomyService.INSTANCE.buyChunks(player.uniqueId(), chunks)
-                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                    if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                        return;
-                    }
-                    if (result.success()) {
-                        LangUtils.sendLang(player, Languages.COMMAND_BUY_SUCCESS, Map.of(
-                            "<chunks>", String.valueOf(chunks),
-                            "<cost>", money(result.amount()),
-                            "<balance>", money(result.accountBalance())));
-                    } else {
-                        sendFail(player, result.failureReason());
-                    }
-                }));
+            AsyncReply.toPlayer(bukkitPlayer, EconomyService.INSTANCE.buyChunks(player.uniqueId(), chunks), result -> {
+                if (result.success()) {
+                    LangUtils.sendLang(player, Languages.COMMAND_BUY_SUCCESS, Map.of(
+                        "<chunks>", String.valueOf(chunks),
+                        "<cost>", money(result.amount()),
+                        "<balance>", money(result.accountBalance())));
+                } else {
+                    sendFail(player, result.failureReason());
+                }
+            });
         }
 
         @Override
@@ -119,20 +115,16 @@ public final class EconomyCommands {
             if (chunks == null) {
                 return;
             }
-            EconomyService.INSTANCE.sellChunks(player.uniqueId(), chunks)
-                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                    if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                        return;
-                    }
-                    if (result.success()) {
-                        LangUtils.sendLang(player, Languages.COMMAND_SELL_SUCCESS, Map.of(
-                            "<chunks>", String.valueOf(chunks),
-                            "<refund>", money(result.amount()),
-                            "<balance>", money(result.accountBalance())));
-                    } else {
-                        sendFail(player, result.failureReason());
-                    }
-                }));
+            AsyncReply.toPlayer(bukkitPlayer, EconomyService.INSTANCE.sellChunks(player.uniqueId(), chunks), result -> {
+                if (result.success()) {
+                    LangUtils.sendLang(player, Languages.COMMAND_SELL_SUCCESS, Map.of(
+                        "<chunks>", String.valueOf(chunks),
+                        "<refund>", money(result.amount()),
+                        "<balance>", money(result.accountBalance())));
+                } else {
+                    sendFail(player, result.failureReason());
+                }
+            });
         }
 
         @Override
@@ -194,10 +186,7 @@ public final class EconomyCommands {
             var future = deposit
                 ? EconomyService.INSTANCE.deposit(player.uniqueId(), world, cx, cz, amount)
                 : EconomyService.INSTANCE.withdraw(player.uniqueId(), world, cx, cz, amount);
-            future.whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
-                }
+            AsyncReply.toPlayer(bukkitPlayer, future, result -> {
                 if (result.success()) {
                     LangUtils.sendLang(player,
                         deposit ? Languages.COMMAND_BANK_DEPOSIT_SUCCESS : Languages.COMMAND_BANK_WITHDRAW_SUCCESS,
@@ -205,7 +194,7 @@ public final class EconomyCommands {
                 } else {
                     sendFail(player, result.failureReason());
                 }
-            }));
+            });
         }
 
         @Override

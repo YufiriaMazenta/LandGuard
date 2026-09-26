@@ -10,6 +10,7 @@ import crypticlib.lifecycle.LifecyclePhase;
 import crypticlib.lifecycle.LifecycleSchedule;
 import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.database.DataSourceManager;
 import pers.yufiria.landguard.database.SchemaMigrations;
 import pers.yufiria.landguard.database.entity.*;
@@ -22,8 +23,8 @@ import java.sql.SQLException;
  */
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, isAsync = true, priority = -1),
-        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, isAsync = true, priority = -1)
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, isAsync = true, priority = LifecycleOrder.DAO),
+        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, isAsync = true, priority = LifecycleOrder.DAO)
     }
 )
 public enum LandDaoManager implements LifecycleTask {

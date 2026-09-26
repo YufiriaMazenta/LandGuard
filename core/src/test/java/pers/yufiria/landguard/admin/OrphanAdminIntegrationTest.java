@@ -12,7 +12,9 @@ import pers.yufiria.landguard.claim.ClaimOpResult;
 import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.config.UpkeepConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
+import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotAudit;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.*;
 import pers.yufiria.landguard.group.GroupOpResult;
@@ -81,7 +83,10 @@ public class OrphanAdminIntegrationTest {
         set(UpkeepConfigs.INACTIVITY_ENABLED, null);
         set(UpkeepConfigs.ORPHAN_ENABLED, null);
         set(UpkeepConfigs.ORPHAN_GRACE_SECONDS, null);
+        // 增量重载安全网：已发布快照必须与全量重读按值一致
+        SnapshotAudit.assertFresh(DataStore.INSTANCE.snapshot());
         DataStore.INSTANCE.joinReload();
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
         connection.close();
     }
 
@@ -200,8 +205,8 @@ public class OrphanAdminIntegrationTest {
     void unknownProviderTypeIsOrphanAndReleasedAfterGrace() throws Exception {
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, "thirdparty-org", "org-42", "Ext", false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, "thirdparty-org", "org-42", "Ext").createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 4, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
 
@@ -257,9 +262,9 @@ public class OrphanAdminIntegrationTest {
         quota(ALICE, 2);
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home",
-            false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home")
+            .createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 0, 0));
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 1, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
@@ -278,9 +283,11 @@ public class OrphanAdminIntegrationTest {
         quota(ALICE, 2);
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home",
-            false, now, now, 5D, true, 123L, 456L, 789L, 0L));
+        // 带非零生命周期字段：验证转让后全部归零
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home")
+            .createdAt(now).lastActiveAt(now).bankBalance(5D).upkeepExempt(true)
+            .upkeepChargedAt(123L).upkeepUnpaidSince(456L).inactiveWarnedAt(789L).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 0, 0));
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 1, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
@@ -313,9 +320,9 @@ public class OrphanAdminIntegrationTest {
         quota(ALICE, 1);
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home",
-            false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home")
+            .createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 7, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
 

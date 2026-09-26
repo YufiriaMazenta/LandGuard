@@ -1,6 +1,5 @@
 package pers.yufiria.landguard.ui;
 
-import crypticlib.CrypticLibBukkit;
 import crypticlib.lang.entry.StringLangEntry;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.MenuDisplay;
@@ -22,6 +21,7 @@ import pers.yufiria.landguard.protection.BuiltinFlagDefaults;
 import pers.yufiria.landguard.protection.FlagService;
 import pers.yufiria.landguard.protection.ProtectionChecker;
 import pers.yufiria.landguard.protection.ProtectionFlag;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.LangUtils;
 
 import java.util.ArrayList;
@@ -196,13 +196,10 @@ public class FlagListMenu extends Menu {
                 ? FlagService.INSTANCE.resetBehaviorOverride(claimId, roleId, flag)
                 : FlagService.INSTANCE.setBehaviorOverride(claimId, roleId, flag, next);
         }
-        future.whenComplete((ok, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
-            if (!player.isOnline() || throwable != null) {
-                return;
-            }
+        AsyncReply.toPlayer(player, future, result -> {
             this.display = buildDisplay();
             updateMenu(true);
-        }));
+        });
     }
 
     private boolean canManage(Player player) {

@@ -5,11 +5,11 @@ import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotPart;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.PlayerData;
-import pers.yufiria.landguard.database.entity.PlayerQuotaData;
 import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.*;
 import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner;
@@ -19,7 +19,6 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -73,7 +72,6 @@ public enum ClaimService {
 
             long capacity = UNLIMITED;
             long usedChunks = ClaimEngine.currentClaimedChunks(current, owner);
-            PlayerQuotaData quota = null;
             UUID playerUuid = null;
             if (!admin && owner.typeKey().equals(BuiltinOwnerTypes.PLAYER)) {
                 playerUuid = parseUuid(owner.identifier());
@@ -81,8 +79,7 @@ public enum ClaimService {
                     resultRef.set(ClaimOpResult.failed(ClaimFailureReason.INVALID_TARGETS));
                     return current;
                 }
-                quota = loadOrCreateQuota(playerUuid);
-                usedChunks = Math.max(quota.getUsedChunks(), ClaimEngine.currentClaimedChunks(current, owner));
+                usedChunks = PlayerQuotaLedger.effectiveUsed(current, playerUuid);
                 PlayerData playerData = LandDaoManager.INSTANCE.playerDao().queryForId(playerUuid);
                 capacity = capacityOf(playerData);
             } else if (!admin && owner.typeKey().equals(BuiltinOwnerTypes.GROUP)) {
@@ -113,19 +110,20 @@ public enum ClaimService {
             String claimId = findClaimInWorld(current, effectiveOwner, world);
             if (claimId == null) {
                 claimId = UUID.randomUUID().toString();
-                daos.claimDao().create(new ClaimData(claimId, world,
-                    effectiveOwner.typeKey(), effectiveOwner.identifier(),
-                    defaultName, admin, now, now, 0D, false));
+                daos.claimDao().create(ClaimData.builder(claimId, world,
+                        effectiveOwner.typeKey(), effectiveOwner.identifier(), defaultName)
+                    .admin(admin).createdAt(now).lastActiveAt(now).build());
             }
             for (ChunkLoc target : targets) {
                 daos.claimChunkDao().create(new ClaimChunkData(claimId, world, target.x(), target.z()));
             }
-            if (quota != null) {
-                quota.setUsedChunks((int) Math.min(Integer.MAX_VALUE, usedChunks + targets.size()));
-                daos.playerQuotaDao().update(quota);
+            if (playerUuid != null) {
+                PlayerQuotaLedger.charge(playerUuid, current, targets.size());
             }
 
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 只重读本次真正改动的组件：领地行与区块都限定在这一块领地上
+            DataSnapshot next = DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
+            next = DataStore.reloadScoped(SnapshotPart.CLAIM_CHUNK, claimId);
             long available;
             if (admin) {
                 available = UNLIMITED;
@@ -173,6 +171,7 @@ public enum ClaimService {
             }
 
             LandDaoManager daos = LandDaoManager.INSTANCE;
+            Set<String> emptiedClaims = new LinkedHashSet<>();
             for (Map.Entry<String, List<ChunkLoc>> entry : byClaim.entrySet()) {
                 String claimId = entry.getKey();
                 for (ChunkLoc target : entry.getValue()) {
@@ -195,21 +194,28 @@ public enum ClaimService {
                     var settingDelete = daos.claimSettingDao().deleteBuilder();
                     settingDelete.where(w -> w.equals("claim_id", claimId));
                     settingDelete.delete();
+                    emptiedClaims.add(claimId);
                 }
             }
 
             int refunded = 0;
             UUID playerUuid = owner.typeKey().equals(BuiltinOwnerTypes.PLAYER) ? parseUuid(owner.identifier()) : null;
             if (playerUuid != null) {
-                PlayerQuotaData quota = loadOrCreateQuota(playerUuid);
                 double ratio = Math.max(0D, Math.min(1D, ConfigValues.get(ClaimConfigs.UNCLAIM_RETURN_RATIO)));
                 refunded = (int) Math.floor(targets.size() * ratio);
-                int remainingClaimed = Math.max(0, ClaimEngine.currentClaimedChunks(current, owner) - targets.size());
-                quota.setUsedChunks(Math.max(remainingClaimed, quota.getUsedChunks() - refunded));
-                daos.playerQuotaDao().update(quota);
+                PlayerQuotaLedger.refund(playerUuid, current, targets.size(), refunded);
             }
 
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 区块一定变了；整领被放弃时三张附属表也要按该领地范围重读
+            DataSnapshot next = current;
+            for (String affected : byClaim.keySet()) {
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM_CHUNK, affected);
+            }
+            for (String emptied : emptiedClaims) {
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM, emptied);
+                next = DataStore.reloadScoped(SnapshotPart.ROLE_FLAG, emptied);
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM_SETTING, emptied);
+            }
             long available;
             if (playerUuid != null) {
                 available = availableChunks(playerUuid, next);
@@ -273,6 +279,7 @@ public enum ClaimService {
             }
 
             LandDaoManager daos = LandDaoManager.INSTANCE;
+            Set<String> emptiedClaims = new LinkedHashSet<>();
             for (Map.Entry<String, List<ChunkLoc>> entry : byClaim.entrySet()) {
                 String claimId = entry.getKey();
                 for (ChunkLoc target : entry.getValue()) {
@@ -295,27 +302,29 @@ public enum ClaimService {
                     var settingDelete = daos.claimSettingDao().deleteBuilder();
                     settingDelete.where(w -> w.equals("claim_id", claimId));
                     settingDelete.delete();
+                    emptiedClaims.add(claimId);
                 }
             }
 
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 区块一定变了；整领被删时三张附属表也要按该领地范围重读
+            DataSnapshot next = current;
+            for (String affected : byClaim.keySet()) {
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM_CHUNK, affected);
+            }
+            for (String emptied : emptiedClaims) {
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM, emptied);
+                next = DataStore.reloadScoped(SnapshotPart.ROLE_FLAG, emptied);
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM_SETTING, emptied);
+            }
             // 校正受影响个人所有者的已用额度：按其剩余实际持有量取值，系统操作不扣减/赠送额度
             for (ClaimData claim : affectedOwners.values()) {
                 if (!BuiltinOwnerTypes.PLAYER.equals(claim.getOwnerType())) {
                     continue;
                 }
                 UUID ownerUuid = parseUuid(claim.getOwnerId());
-                if (ownerUuid == null) {
-                    continue;
+                if (ownerUuid != null) {
+                    PlayerQuotaLedger.trimToActual(ownerUuid, next);
                 }
-                PlayerQuotaData quota = daos.playerQuotaDao().queryForId(ownerUuid);
-                if (quota == null) {
-                    continue;
-                }
-                int actual = ClaimEngine.currentClaimedChunks(
-                    next, OwnerRef.of(BuiltinOwnerTypes.PLAYER, ownerUuid.toString()));
-                quota.setUsedChunks(Math.max(actual, 0));
-                daos.playerQuotaDao().update(quota);
             }
 
             String claimId = byClaim.size() == 1 ? byClaim.keySet().iterator().next() : null;
@@ -375,7 +384,7 @@ public enum ClaimService {
             fresh.setName(name);
             LandDaoManager.INSTANCE.claimDao().update(fresh);
             resultRef.set(ClaimOpResult.renamed(claimId));
-            return DataStore.rebuildSnapshot();
+            return DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
         }).thenApply(snapshot -> resultRef.get());
     }
 
@@ -414,33 +423,29 @@ public enum ClaimService {
             String oldOwnerType = fresh.getOwnerType();
             String oldOwnerId = fresh.getOwnerId();
             long now = System.currentTimeMillis();
-            ClaimData transferred = new ClaimData(
-                fresh.getClaimId(), fresh.getWorldUuid(), BuiltinOwnerTypes.PLAYER, target.toString(),
-                fresh.getName(), false, fresh.getCreatedAt(), now,
-                fresh.getBankBalance(), false, 0L, 0L, 0L, 0L
-            );
+            // 生命周期时间戳全部归零：转让后重新开始计费与活跃判定
+            ClaimData transferred = ClaimData.builder(
+                    fresh.getClaimId(), fresh.getWorldUuid(), BuiltinOwnerTypes.PLAYER, target.toString(),
+                    fresh.getName())
+                .createdAt(fresh.getCreatedAt())
+                .lastActiveAt(now)
+                .bankBalance(fresh.getBankBalance())
+                .build();
             daos.claimDao().update(transferred);
             if (daos.playerDao().queryForId(target) == null) {
                 daos.playerDao().create(new PlayerData(
                     target, ConfigValues.get(ClaimConfigs.START_CHUNKS), 0, now));
             }
 
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 领地行换了所有者，且转让目标可能新建了玩家行
+            DataSnapshot next = DataStore.reload(SnapshotPart.PLAYER);
+            next = DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
             // 新所有者：已用额度至少覆盖实际持有（允许超出容量，不拒绝转让）
-            OwnerRef targetRef = OwnerRef.of(BuiltinOwnerTypes.PLAYER, target.toString());
-            PlayerQuotaData targetQuota = loadOrCreateQuota(target);
-            targetQuota.setUsedChunks(Math.max(
-                targetQuota.getUsedChunks(), ClaimEngine.currentClaimedChunks(next, targetRef)));
-            daos.playerQuotaDao().update(targetQuota);
+            PlayerQuotaLedger.raiseToActual(target, next);
             // 原个人所有者：额度按剩余实际持有量校正
             UUID oldUuid = BuiltinOwnerTypes.PLAYER.equals(oldOwnerType) ? parseUuid(oldOwnerId) : null;
             if (oldUuid != null && !oldUuid.equals(target)) {
-                PlayerQuotaData oldQuota = daos.playerQuotaDao().queryForId(oldUuid);
-                if (oldQuota != null) {
-                    oldQuota.setUsedChunks(Math.max(0, ClaimEngine.currentClaimedChunks(
-                        next, OwnerRef.of(BuiltinOwnerTypes.PLAYER, oldOwnerId))));
-                    daos.playerQuotaDao().update(oldQuota);
-                }
+                PlayerQuotaLedger.trimToActual(oldUuid, next);
             }
             resultRef.set(ClaimOpResult.transferred(claimId,
                 next.chunksByClaim().getOrDefault(claimId, Set.of()).size()));
@@ -477,8 +482,8 @@ public enum ClaimService {
                 data.setLastLogin(now);
                 daos.playerDao().update(data);
             }
-            loadOrCreateQuota(uuid);
-            return DataStore.rebuildSnapshot();
+            PlayerQuotaLedger.ensure(uuid);
+            return DataStore.reload(SnapshotPart.PLAYER);
         }).thenApply(snapshot -> null);
     }
 
@@ -504,48 +509,15 @@ public enum ClaimService {
                 daos.playerDao().update(data);
             }
             grantedRef.set(granted);
-            return DataStore.rebuildSnapshot();
+            return DataStore.reload(SnapshotPart.PLAYER);
         }).thenApply(snapshot -> grantedRef.get());
     }
 
-    /**
-     * 查询玩家当前可用区块额度（走写线程，主线程不得直接调用 DAO）。
-     */
-    public CompletableFuture<Long> availableChunks(OwnerRef owner) {
-        if (owner.typeKey().equals(BuiltinOwnerTypes.GROUP)) {
-            AtomicLong groupAvailable = new AtomicLong();
-            return DataStore.INSTANCE.mutate(current -> {
-                if (!current.groups().containsKey(owner.identifier())) {
-                    groupAvailable.set(0L);
-                } else {
-                    groupAvailable.set(Math.max(0L,
-                        GroupService.INSTANCE.groupCapacity(current, owner.identifier())
-                            - ClaimEngine.currentClaimedChunks(current, owner)));
-                }
-                return current;
-            }).thenApply(snapshot -> groupAvailable.get());
-        }
-        if (!owner.typeKey().equals(BuiltinOwnerTypes.PLAYER)) {
-            return CompletableFuture.completedFuture(UNLIMITED);
-        }
-        UUID uuid = parseUuid(owner.identifier());
-        if (uuid == null) {
-            return CompletableFuture.completedFuture(0L);
-        }
-        AtomicLong availableRef = new AtomicLong();
-        return DataStore.INSTANCE.mutate(current -> {
-            availableRef.set(availableChunks(uuid, current));
-            return current;
-        }).thenApply(snapshot -> availableRef.get());
-    }
-
+    /** 玩家可用区块额度（写线程内调用）：容量减去账本与实际持有量中的较大者。 */
     private long availableChunks(UUID uuid, DataSnapshot snapshot) throws SQLException {
         PlayerData playerData = LandDaoManager.INSTANCE.playerDao().queryForId(uuid);
         long capacity = capacityOf(playerData);
-        PlayerQuotaData quota = loadOrCreateQuota(uuid);
-        long used = Math.max(quota.getUsedChunks(), ClaimEngine.currentClaimedChunks(
-            snapshot, OwnerRef.of(BuiltinOwnerTypes.PLAYER, uuid.toString())));
-        return Math.max(0L, capacity - used);
+        return Math.max(0L, capacity - PlayerQuotaLedger.effectiveUsed(snapshot, uuid));
     }
 
     private long capacityOf(@Nullable PlayerData playerData) {
@@ -553,16 +525,6 @@ public enum ClaimService {
             return ConfigValues.get(ClaimConfigs.START_CHUNKS);
         }
         return (long) playerData.getAccruedChunks() + playerData.getBoughtChunks();
-    }
-
-    private PlayerQuotaData loadOrCreateQuota(UUID uuid) throws SQLException {
-        var quotaDao = LandDaoManager.INSTANCE.playerQuotaDao();
-        PlayerQuotaData quota = quotaDao.queryForId(uuid);
-        if (quota == null) {
-            quota = new PlayerQuotaData(uuid, 0);
-            quotaDao.create(quota);
-        }
-        return quota;
     }
 
     private @Nullable String findClaimInWorld(DataSnapshot snapshot, OwnerRef owner, UUID world) {

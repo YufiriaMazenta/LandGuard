@@ -10,7 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import pers.yufiria.landguard.config.UpkeepConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
+import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotAudit;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.*;
 import pers.yufiria.landguard.economy.EconomyProvider;
@@ -99,7 +101,10 @@ public class UpkeepCycleIntegrationTest {
         set(UpkeepConfigs.INACTIVITY_THRESHOLD_SECONDS, null);
         set(UpkeepConfigs.INACTIVITY_GRACE_SECONDS, null);
         set(UpkeepConfigs.COST_PER_CHUNK, null);
+        // 增量重载安全网：已发布快照必须与全量重读按值一致
+        SnapshotAudit.assertFresh(DataStore.INSTANCE.snapshot());
         DataStore.INSTANCE.joinReload();
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
         connection.close();
     }
 
@@ -124,8 +129,9 @@ public class UpkeepCycleIntegrationTest {
                          boolean admin, boolean exempt, int baseX) throws Exception {
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, ownerType, ownerId, ownerId + "-claim", admin, now, now, bank, exempt));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, ownerType, ownerId, ownerId + "-claim")
+            .admin(admin).createdAt(now).lastActiveAt(now).bankBalance(bank).upkeepExempt(exempt).build());
         for (int i = 0; i < chunks; i++) {
             LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, baseX + i, 0));
         }

@@ -82,8 +82,8 @@ public class MysqlRoundTripTest {
         }
 
         LandDaoManager daos = LandDaoManager.INSTANCE;
-        daos.claimDao().create(new ClaimData(CLAIM_ID, WORLD, "player", PLAYER.toString(),
-            "home", false, 1000L, 2000L, 12.5, false));
+        daos.claimDao().create(ClaimData.builder(CLAIM_ID, WORLD, "player", PLAYER.toString(), "home")
+            .createdAt(1000L).lastActiveAt(2000L).bankBalance(12.5).build());
         daos.claimChunkDao().create(new ClaimChunkData(CLAIM_ID, WORLD, 3, -7));
         daos.claimChunkDao().create(new ClaimChunkData(CLAIM_ID, WORLD, 3, -6));
         daos.roleFlagDao().create(new ClaimRoleFlagData(CLAIM_ID, "member", "CONTAINER", false));

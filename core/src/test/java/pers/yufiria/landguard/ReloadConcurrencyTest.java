@@ -41,8 +41,8 @@ public class ReloadConcurrencyTest {
         int chunksPerClaim = 4;
         for (int i = 0; i < claimCount; i++) {
             String claimId = new UUID(0, i + 1).toString();
-            daos.claimDao().create(new ClaimData(claimId, world, "player",
-                UUID.randomUUID().toString(), null, false, 1L, 1L, 0, false));
+            daos.claimDao().create(ClaimData.builder(claimId, world, "player",
+                UUID.randomUUID().toString(), null).createdAt(1L).lastActiveAt(1L).build());
             for (int j = 0; j < chunksPerClaim; j++) {
                 daos.claimChunkDao().create(new ClaimChunkData(claimId, world, i * 2, j));
             }
@@ -103,6 +103,8 @@ public class ReloadConcurrencyTest {
         assertEquals(claimCount, finalSnapshot.claimsById().size());
         assertEquals((long) claimCount * chunksPerClaim, finalSnapshot.claimIdByChunk().size());
         connection.close();
+        // 收尾清空已发布快照，避免该测试的 sqlite 数据残留影响后续测试类
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
     }
 
 }

@@ -3,6 +3,7 @@ package pers.yufiria.landguard.protection;
 import org.jetbrains.annotations.NotNull;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotPart;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimRoleFlagData;
 
@@ -11,7 +12,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 领地级 flag 覆盖写服务。全部变更走 DataStore 单写线程：DAO upsert/delete 后全量重建快照。
+ * 领地级 flag 覆盖写服务。全部变更走 DataStore 单写线程：DAO upsert/delete 后按领地范围重读该领地的 flag。
  * 角色与 flag 在此始终作为两个独立维度落库（claim_id + role_id + flag_key）。
  */
 public enum FlagService {
@@ -80,7 +81,7 @@ public enum FlagService {
                 daos.roleFlagDao().update(row);
             }
             outcome.set(true);
-            return DataStore.rebuildSnapshot();
+            return DataStore.reloadScoped(SnapshotPart.ROLE_FLAG, claimId);
         }).thenApply(ignored -> outcome.get());
     }
 
@@ -100,7 +101,7 @@ public enum FlagService {
                 .equals("flag_key", flag.id())
             ).delete();
             outcome.set(true);
-            return DataStore.rebuildSnapshot();
+            return DataStore.reloadScoped(SnapshotPart.ROLE_FLAG, claimId);
         }).thenApply((DataSnapshot ignored) -> outcome.get());
     }
 

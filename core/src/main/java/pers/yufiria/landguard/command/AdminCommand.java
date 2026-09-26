@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -30,6 +29,7 @@ import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner;
 import pers.yufiria.landguard.upkeep.UpkeepNotifications;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.ConfigValues;
 import pers.yufiria.landguard.util.LangUtils;
@@ -122,11 +122,9 @@ public final class AdminCommand extends CommandNode {
         List<ChunkLoc> targets = standingTargets(player, radius);
         OwnerRef server = OwnerRef.of(BuiltinOwnerTypes.SERVER, ServerClaimOwner.ID);
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        ClaimService.INSTANCE.claim(server, bukkitPlayer.getWorld().getUID(), targets, "Admin Claim", true)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
-                }
+        AsyncReply.toPlayer(bukkitPlayer,
+            ClaimService.INSTANCE.claim(server, bukkitPlayer.getWorld().getUID(), targets, "Admin Claim", true),
+            result -> {
                 if (result.success()) {
                     LangUtils.sendLang(player, Languages.COMMAND_ADMIN_CLAIM_SUCCESS,
                         Map.of("<count>", String.valueOf(result.affectedChunks())));
@@ -134,7 +132,7 @@ public final class AdminCommand extends CommandNode {
                 } else {
                     ClaimMessages.failure(player, result.failureReason());
                 }
-            }));
+            });
     }
 
     private void unclaim(CommonPlayer player, List<String> args) {
@@ -144,18 +142,14 @@ public final class AdminCommand extends CommandNode {
         }
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         List<ChunkLoc> targets = standingTargets(player, radius);
-        ClaimService.INSTANCE.adminUnclaim(targets)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
-                }
-                if (result.success()) {
-                    LangUtils.sendLang(player, Languages.COMMAND_ADMIN_UNCLAIM_SUCCESS,
-                        Map.of("<count>", String.valueOf(result.affectedChunks())));
-                } else {
-                    ClaimMessages.failure(player, result.failureReason());
-                }
-            }));
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.adminUnclaim(targets), result -> {
+            if (result.success()) {
+                LangUtils.sendLang(player, Languages.COMMAND_ADMIN_UNCLAIM_SUCCESS,
+                    Map.of("<count>", String.valueOf(result.affectedChunks())));
+            } else {
+                ClaimMessages.failure(player, result.failureReason());
+            }
+        });
     }
 
     // ================= 强制转让 / 释放 / 豁免 =================
@@ -176,15 +170,11 @@ public final class AdminCommand extends CommandNode {
             return;
         }
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        AdminService.INSTANCE.transferClaim(standing.getClaimId(), target)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null) {
-                    return;
-                }
-                sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_TRANSFER_SUCCESS, Map.of(
-                    "<player>", args.getFirst(),
-                    "<chunks>", String.valueOf(result.affectedChunks())));
-            }));
+        AsyncReply.toPlayer(bukkitPlayer,
+            AdminService.INSTANCE.transferClaim(standing.getClaimId(), target),
+            result -> sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_TRANSFER_SUCCESS, Map.of(
+                "<player>", args.getFirst(),
+                "<chunks>", String.valueOf(result.affectedChunks()))));
     }
 
     private void release(CommonPlayer player, List<String> args) {
@@ -194,15 +184,10 @@ public final class AdminCommand extends CommandNode {
         }
         String claimId = args.getFirst();
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        AdminService.INSTANCE.releaseClaim(claimId)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null) {
-                    return;
-                }
-                sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_RELEASE_SUCCESS, Map.of(
-                    "<claim>", claimId,
-                    "<chunks>", String.valueOf(result.affectedChunks())));
-            }));
+        AsyncReply.toPlayer(bukkitPlayer, AdminService.INSTANCE.releaseClaim(claimId),
+            result -> sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_RELEASE_SUCCESS, Map.of(
+                "<claim>", claimId,
+                "<chunks>", String.valueOf(result.affectedChunks()))));
     }
 
     private void exempt(CommonPlayer player, List<String> args) {
@@ -222,14 +207,9 @@ public final class AdminCommand extends CommandNode {
         }
         String claimId = standing.getClaimId();
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        AdminService.INSTANCE.setExempt(claimId, exempt)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null) {
-                    return;
-                }
-                sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_EXEMPT_SET, Map.of(
-                    "<exempt>", String.valueOf(exempt)));
-            }));
+        AsyncReply.toPlayer(bukkitPlayer, AdminService.INSTANCE.setExempt(claimId, exempt),
+            result -> sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_EXEMPT_SET, Map.of(
+                "<exempt>", String.valueOf(exempt))));
     }
 
     // ================= 重命名 =================
@@ -248,15 +228,10 @@ public final class AdminCommand extends CommandNode {
         // 名字允许带空格，整段参数拼接后再交给服务层 trim 与长度校验
         String name = String.join(" ", args);
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        AdminService.INSTANCE.renameClaim(claimId, name)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null) {
-                    return;
-                }
-                sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_RENAME_SUCCESS, Map.of(
-                    "<claim>", claimId,
-                    "<name>", ClaimService.normalizeClaimName(name)));
-            }));
+        AsyncReply.toPlayer(bukkitPlayer, AdminService.INSTANCE.renameClaim(claimId, name),
+            result -> sendAdminResult(bukkitPlayer, result, Languages.COMMAND_ADMIN_RENAME_SUCCESS, Map.of(
+                "<claim>", claimId,
+                "<name>", ClaimService.normalizeClaimName(name))));
     }
 
     // ================= 信息 / 孤儿列表 =================
@@ -320,16 +295,13 @@ public final class AdminCommand extends CommandNode {
 
     private void run(CommonPlayer player) {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        AdminService.INSTANCE.runMaintenance(System.currentTimeMillis())
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null) {
-                    return;
-                }
+        AsyncReply.toPlayer(bukkitPlayer, AdminService.INSTANCE.runMaintenance(System.currentTimeMillis()),
+            result -> {
                 UpkeepNotifications.dispatch(result);
                 LangUtils.sendLang(player, Languages.COMMAND_ADMIN_RUN_DONE, Map.of(
                     "<released>", String.valueOf(result.released()),
                     "<charged>", String.valueOf(result.fullyCharged())));
-            }));
+            });
     }
 
     // ================= 工具 =================

@@ -6,6 +6,7 @@ import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotPart;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
@@ -67,7 +68,7 @@ public enum GroupService {
             LandDaoManager daos = LandDaoManager.INSTANCE;
             daos.groupDao().create(new GroupData(wantedId, wantedName, creator, now, 0D));
             daos.groupMemberDao().create(new GroupMemberData(wantedId, creator, Roles.OWNER));
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER);
             notifyChanged(wantedId);
             resultRef.set(GroupOpResult.ok(wantedId));
             return next;
@@ -94,7 +95,7 @@ public enum GroupService {
             }
             stored.setName(wantedName);
             LandDaoManager.INSTANCE.groupDao().update(stored);
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -112,7 +113,8 @@ public enum GroupService {
             deleteByGroup(daos.groupMemberDao(), group.getGroupId());
             daos.groupDao().delete(group);
             pendingInvites.remove(group.getGroupId());
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(
+                SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER, SnapshotPart.GROUP_ROLE);
             // 名下领地不删除：提供者将无法解析该所有者 → 孤儿流程
             ClaimOwnerRegistry.INSTANCE.notifyOwnerRemoved(
                 OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId()));
@@ -176,7 +178,7 @@ public enum GroupService {
             }
             LandDaoManager.INSTANCE.groupMemberDao()
                 .create(new GroupMemberData(group.getGroupId(), player, Roles.MEMBER));
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_MEMBER);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -195,7 +197,7 @@ public enum GroupService {
                 return current;
             }
             deleteMember(group.getGroupId(), player);
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_MEMBER);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -223,7 +225,7 @@ public enum GroupService {
                 return current;
             }
             deleteMember(group.getGroupId(), target);
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_MEMBER);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -245,11 +247,17 @@ public enum GroupService {
                 return current;
             }
             LandDaoManager daos = LandDaoManager.INSTANCE;
-            group.setLeaderUuid(target);
-            daos.groupDao().update(group);
+            // 快照中的 GroupData 不可改写：先取一份数据库副本再改，避免就地篡改已发布的旧快照
+            GroupData storedLeader = daos.groupDao().queryForId(group.getGroupId());
+            if (storedLeader == null) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.GROUP_NOT_FOUND));
+                return current;
+            }
+            storedLeader.setLeaderUuid(target);
+            daos.groupDao().update(storedLeader);
             upsertMemberRole(daos, group.getGroupId(), target, Roles.OWNER);
             upsertMemberRole(daos, group.getGroupId(), actor, Roles.MANAGER);
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -282,7 +290,7 @@ public enum GroupService {
             }
             LandDaoManager.INSTANCE.groupRoleDao()
                 .create(new GroupRoleData(group.getGroupId(), roleId, priority, displayName.trim()));
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_ROLE);
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
         });
@@ -310,7 +318,7 @@ public enum GroupService {
                 return current;
             }
             upsertMemberRole(LandDaoManager.INSTANCE, group.getGroupId(), target, roleId);
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_MEMBER);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -343,13 +351,22 @@ public enum GroupService {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_CLAIM_OWNER));
                 return current;
             }
-            ClaimData transferred = new ClaimData(
-                claim.getClaimId(), claim.getWorldUuid(), BuiltinOwnerTypes.GROUP, group.getGroupId(),
-                claim.getName(), claim.isAdmin(), claim.getCreatedAt(), claim.getLastActiveAt(),
-                claim.getBankBalance(), claim.isUpkeepExempt(),
-                claim.getUpkeepChargedAt(), claim.getUpkeepUnpaidSince(), claim.getInactiveWarnedAt());
+            // 只换所有者：区块、设置、flag、银行与生命周期状态全部保留
+            ClaimData transferred = ClaimData.builder(
+                    claim.getClaimId(), claim.getWorldUuid(), BuiltinOwnerTypes.GROUP, group.getGroupId(),
+                    claim.getName())
+                .admin(claim.isAdmin())
+                .createdAt(claim.getCreatedAt())
+                .lastActiveAt(claim.getLastActiveAt())
+                .bankBalance(claim.getBankBalance())
+                .upkeepExempt(claim.isUpkeepExempt())
+                .upkeepChargedAt(claim.getUpkeepChargedAt())
+                .upkeepUnpaidSince(claim.getUpkeepUnpaidSince())
+                .inactiveWarnedAt(claim.getInactiveWarnedAt())
+                .build();
             LandDaoManager.INSTANCE.claimDao().update(transferred);
-            DataSnapshot next = DataStore.rebuildSnapshot();
+            // 领地行改了所有者，claimsByOwner 必须按新归属重算
+            DataSnapshot next = DataStore.reloadScoped(SnapshotPart.CLAIM, claim.getClaimId());
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;

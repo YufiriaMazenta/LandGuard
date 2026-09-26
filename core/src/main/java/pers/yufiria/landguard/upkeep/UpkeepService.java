@@ -5,6 +5,7 @@ import pers.yufiria.landguard.claim.ClaimRelease;
 import pers.yufiria.landguard.config.UpkeepConfigs;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotPart;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
@@ -111,8 +112,9 @@ public enum UpkeepService {
                 claim.setUpkeepExempt(exempt);
                 LandDaoManager.INSTANCE.claimDao().update(claim);
                 found.set(true);
+                return DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
             }
-            return DataStore.rebuildSnapshot();
+            return current;
         }).thenApply(next -> found.get());
     }
 

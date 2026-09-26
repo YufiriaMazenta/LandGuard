@@ -6,6 +6,7 @@ import crypticlib.lifecycle.LifecyclePhase;
 import crypticlib.lifecycle.LifecycleSchedule;
 import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.config.PluginConfigs;
 import pers.yufiria.landguard.exception.UnsupportedVersionException;
@@ -14,7 +15,7 @@ import pers.yufiria.landguard.util.LangUtils;
 
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = 2)
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = LifecycleOrder.PLUGIN)
     }
 )
 public final class LandGuard extends BukkitPlugin implements LifecycleTask {

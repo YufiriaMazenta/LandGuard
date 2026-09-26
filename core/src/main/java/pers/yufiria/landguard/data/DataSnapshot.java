@@ -84,4 +84,28 @@ public record DataSnapshot(
         return claimId == null ? null : claimsById.get(claimId);
     }
 
+    /** 替换领地索引与它的派生索引，其余组件沿用本快照。 */
+    public DataSnapshot withClaims(Map<String, ClaimData> claimsById, Map<OwnerRef, Set<String>> claimsByOwner) {
+        return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+    }
+
+    /** 替换区块归属的两个索引，其余组件沿用本快照。 */
+    public DataSnapshot withChunkIndex(Map<ChunkLoc, String> claimIdByChunk, Map<String, Set<ChunkLoc>> chunksByClaim) {
+        return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+    }
+
+    /** 替换按领地的 flag 覆盖表，其余组件沿用本快照。 */
+    public DataSnapshot withRoleFlags(Map<String, Map<String, Map<String, Boolean>>> roleFlagsByClaim) {
+        return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+    }
+
+    /** 替换按领地的设置表，其余组件沿用本快照。 */
+    public DataSnapshot withSettings(Map<String, Map<String, String>> settingsByClaim) {
+        return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+    }
+
 }

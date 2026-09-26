@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -21,6 +20,7 @@ import pers.yufiria.landguard.database.entity.GroupRoleData;
 import pers.yufiria.landguard.group.GroupOpResult;
 import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -215,27 +215,23 @@ public final class GroupCommand extends CommandNode {
             return;
         }
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        GroupService.INSTANCE.invite(player.uniqueId(), groupName, target)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
+        AsyncReply.toPlayer(bukkitPlayer, GroupService.INSTANCE.invite(player.uniqueId(), groupName, target), result -> {
+            if (result.success()) {
+                LangUtils.sendLang(player, Languages.COMMAND_GROUP_INVITE_SENT, Map.of(
+                    "<group>", groupName, "<player>", args.get(1)));
+                Player online = Bukkit.getPlayer(target);
+                if (online != null) {
+                    // 被邀请者需要用标识符执行 accept，故邀请消息里必须带上它
+                    GroupData invited = GroupService.findById(DataStore.INSTANCE.snapshot(), groupName);
+                    LangUtils.sendLang(online, Languages.COMMAND_GROUP_INVITE_RECEIVED, Map.of(
+                        "<group>", invited == null ? groupName : invited.getName(),
+                        "<group_id>", groupName,
+                        "<leader>", player.name()));
                 }
-                if (result.success()) {
-                    LangUtils.sendLang(player, Languages.COMMAND_GROUP_INVITE_SENT, Map.of(
-                        "<group>", groupName, "<player>", args.get(1)));
-                    Player online = Bukkit.getPlayer(target);
-                    if (online != null) {
-                        // 被邀请者需要用标识符执行 accept，故邀请消息里必须带上它
-                        GroupData invited = GroupService.findById(DataStore.INSTANCE.snapshot(), groupName);
-                        LangUtils.sendLang(online, Languages.COMMAND_GROUP_INVITE_RECEIVED, Map.of(
-                            "<group>", invited == null ? groupName : invited.getName(),
-                            "<group_id>", groupName,
-                            "<leader>", player.name()));
-                    }
-                } else {
-                    sendFailure(player, result);
-                }
-            }));
+            } else {
+                sendFailure(player, result);
+            }
+        });
     }
 
     private void kick(CommonPlayer player, List<String> args) {
@@ -385,16 +381,13 @@ public final class GroupCommand extends CommandNode {
     private void run(CommonPlayer player, CompletableFuture<GroupOpResult> future,
                      StringLangEntry successEntry, Map<String, String> formats) {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
-        future.whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-            if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                return;
-            }
+        AsyncReply.toPlayer(bukkitPlayer, future, result -> {
             if (result.success()) {
                 LangUtils.sendLang(player, successEntry, formats);
             } else {
                 sendFailure(player, result);
             }
-        }));
+        });
     }
 
     /** 用户组操作失败 → 语言条目的统一映射；命令层与 GUI 转让路径共用。 */

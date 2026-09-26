@@ -2,19 +2,18 @@ package pers.yufiria.landguard.economy;
 
 import crypticlib.CrypticLibBukkit;
 import org.jetbrains.annotations.Nullable;
-import pers.yufiria.landguard.claim.ClaimEngine;
+import pers.yufiria.landguard.claim.PlayerQuotaLedger;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.config.EconomyConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotPart;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.database.entity.PlayerData;
-import pers.yufiria.landguard.database.entity.PlayerQuotaData;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
-import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.protection.BuiltinFlags;
 import pers.yufiria.landguard.protection.CheckResult;
 import pers.yufiria.landguard.protection.ProtectionChecker;
@@ -72,7 +71,7 @@ public enum EconomyService {
         // 阶段一：确保玩家数据行存在（纯落库准备）
         return DataStore.INSTANCE.mutate(current -> {
             ensurePlayer(player);
-            return current;
+            return DataStore.reload(SnapshotPart.PLAYER);
         }).thenCompose(snapshot -> onMain(() -> economy.balance(player)).thenCompose(balance -> {
             if (balance + 1e-9 < cost) {
                 return CompletableFuture.completedFuture(EconomyOpResult.failed(EconomyFailureReason.INSUFFICIENT_FUNDS));
@@ -86,7 +85,7 @@ public enum EconomyService {
                     PlayerData data = LandDaoManager.INSTANCE.playerDao().queryForId(player);
                     data.setBoughtChunks(data.getBoughtChunks() + chunks);
                     LandDaoManager.INSTANCE.playerDao().update(data);
-                    return DataStore.rebuildSnapshot();
+                    return DataStore.reload(SnapshotPart.PLAYER);
                 }).handle((next, throwable) -> {
                     if (throwable != null) {
                         economy.deposit(player, cost);
@@ -107,25 +106,24 @@ public enum EconomyService {
             return fail(EconomyFailureReason.INVALID_AMOUNT);
         }
         double refund = (double) chunks * ConfigValues.get(EconomyConfigs.SELL_PRICE_PER_CHUNK);
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.toString());
         AtomicReference<EconomyFailureReason> reject = new AtomicReference<>();
         // 阶段一：快照校验可售额度（不能卖空、不能卖到占用量以下）
         return DataStore.INSTANCE.mutate(current -> {
             ensurePlayer(player);
+            // ensurePlayer 可能新建玩家行，先按组件重读再校验
+            DataSnapshot snapshot = DataStore.reload(SnapshotPart.PLAYER);
             PlayerData data = LandDaoManager.INSTANCE.playerDao().queryForId(player);
             if (data.getBoughtChunks() < chunks) {
                 reject.set(EconomyFailureReason.NOTHING_TO_SELL);
-                return current;
+                return snapshot;
             }
-            PlayerQuotaData quota = LandDaoManager.INSTANCE.playerQuotaDao().queryForId(player);
-            long used = Math.max(quota == null ? 0 : quota.getUsedChunks(),
-                ClaimEngine.currentClaimedChunks(current, owner));
+            long used = PlayerQuotaLedger.effectiveUsed(snapshot, player);
             long capacity = (long) data.getAccruedChunks() + data.getBoughtChunks();
             if (capacity - used < chunks) {
                 reject.set(EconomyFailureReason.QUOTA_IN_USE);
-                return current;
+                return snapshot;
             }
-            return current;
+            return snapshot;
         }).thenCompose(snapshot -> {
             if (reject.get() != null) {
                 return CompletableFuture.completedFuture(EconomyOpResult.failed(reject.get()));
@@ -138,7 +136,7 @@ public enum EconomyService {
                     PlayerData data = LandDaoManager.INSTANCE.playerDao().queryForId(player);
                     data.setBoughtChunks(data.getBoughtChunks() - chunks);
                     LandDaoManager.INSTANCE.playerDao().update(data);
-                    return DataStore.rebuildSnapshot();
+                    return DataStore.reload(SnapshotPart.PLAYER);
                 }).handle((next, throwable) -> {
                     if (throwable != null) {
                         economy.withdraw(player, refund);
@@ -172,32 +170,25 @@ public enum EconomyService {
         if (!(amount > 0) || Double.isNaN(amount) || Double.isInfinite(amount)) {
             return fail(EconomyFailureReason.INVALID_AMOUNT);
         }
-        AtomicReference<EconomyFailureReason> reject = new AtomicReference<>();
-        return DataStore.INSTANCE.mutate(current -> {
-            if (claimAt(current, worldUuid, chunkX, chunkZ) == null) {
-                reject.set(EconomyFailureReason.CLAIM_NOT_FOUND);
+        // 阶段一：只读校验（纯快照读取，不占写线程）
+        if (claimAt(DataStore.INSTANCE.snapshot(), worldUuid, chunkX, chunkZ) == null) {
+            return fail(EconomyFailureReason.CLAIM_NOT_FOUND);
+        }
+        return onMain(() -> economy.withdraw(player, amount)).thenCompose(paid -> {
+            if (!paid) {
+                return CompletableFuture.completedFuture(EconomyOpResult.failed(EconomyFailureReason.INSUFFICIENT_FUNDS));
             }
-            return current;
-        }).thenCompose(snapshot -> {
-            if (reject.get() != null) {
-                return CompletableFuture.completedFuture(EconomyOpResult.failed(reject.get()));
-            }
-            return onMain(() -> economy.withdraw(player, amount)).thenCompose(paid -> {
-                if (!paid) {
-                    return CompletableFuture.completedFuture(EconomyOpResult.failed(EconomyFailureReason.INSUFFICIENT_FUNDS));
+            return DataStore.INSTANCE.mutate(current -> {
+                ClaimData claim = claimAt(current, worldUuid, chunkX, chunkZ);
+                addBank(current, claim, amount);
+                return reloadBank(current, worldUuid, chunkX, chunkZ);
+            }).handle((next, throwable) -> {
+                if (throwable != null) {
+                    economy.deposit(player, amount);
+                    return EconomyOpResult.failed(EconomyFailureReason.INVALID_AMOUNT);
                 }
-                return DataStore.INSTANCE.mutate(current -> {
-                    ClaimData claim = claimAt(current, worldUuid, chunkX, chunkZ);
-                    addBank(current, claim, amount);
-                    return DataStore.rebuildSnapshot();
-                }).handle((next, throwable) -> {
-                    if (throwable != null) {
-                        economy.deposit(player, amount);
-                        return EconomyOpResult.failed(EconomyFailureReason.INVALID_AMOUNT);
-                    }
-                    double bank = bankBalanceAt(DataStore.INSTANCE.snapshot(), worldUuid, chunkX, chunkZ);
-                    return EconomyOpResult.ok(amount, economy.balance(player), bank);
-                });
+                double bank = bankBalanceAt(DataStore.INSTANCE.snapshot(), worldUuid, chunkX, chunkZ);
+                return EconomyOpResult.ok(amount, economy.balance(player), bank);
             });
         });
     }
@@ -211,47 +202,53 @@ public enum EconomyService {
         if (!(amount > 0) || Double.isNaN(amount) || Double.isInfinite(amount)) {
             return fail(EconomyFailureReason.INVALID_AMOUNT);
         }
-        AtomicReference<EconomyFailureReason> reject = new AtomicReference<>();
+        // 阶段一：只读校验（纯快照读取，不占写线程）
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        ClaimData standing = claimAt(snapshot, worldUuid, chunkX, chunkZ);
+        if (standing == null) {
+            return fail(EconomyFailureReason.CLAIM_NOT_FOUND);
+        }
+        // 取款受 BANK flag 控制（owner/manager 默认允许）
+        CheckResult check = ProtectionChecker.checkBehavior(snapshot, player, worldUuid, chunkX, chunkZ,
+            BuiltinFlags.BANK);
+        if (!check.allowed()) {
+            return fail(EconomyFailureReason.BANK_FORBIDDEN);
+        }
+        if (bankBalance(snapshot, standing) + 1e-9 < amount) {
+            return fail(EconomyFailureReason.BANK_EMPTY);
+        }
         return DataStore.INSTANCE.mutate(current -> {
             ClaimData claim = claimAt(current, worldUuid, chunkX, chunkZ);
-            if (claim == null) {
-                reject.set(EconomyFailureReason.CLAIM_NOT_FOUND);
-                return current;
+            addBank(current, claim, -amount);
+            return reloadBank(current, worldUuid, chunkX, chunkZ);
+        }).thenCompose(next -> onMain(() -> economy.deposit(player, amount)).thenCompose(credited -> {
+            if (!credited) {
+                // 银行已扣而入账失败：回滚银行
+                return DataStore.INSTANCE.mutate(current -> {
+                    ClaimData claim = claimAt(current, worldUuid, chunkX, chunkZ);
+                    addBank(current, claim, amount);
+                    return reloadBank(current, worldUuid, chunkX, chunkZ);
+                }).thenApply(s -> EconomyOpResult.failed(EconomyFailureReason.INVALID_AMOUNT));
             }
-            // 取款受 BANK flag 控制（owner/manager 默认允许）
-            CheckResult check = ProtectionChecker.checkBehavior(current, player, worldUuid, chunkX, chunkZ,
-                BuiltinFlags.BANK);
-            if (!check.allowed()) {
-                reject.set(EconomyFailureReason.BANK_FORBIDDEN);
-                return current;
-            }
-            if (bankBalance(current, claim) + 1e-9 < amount) {
-                reject.set(EconomyFailureReason.BANK_EMPTY);
-                return current;
-            }
-            return current;
-        }).thenCompose(snapshot -> {
-            if (reject.get() != null) {
-                return CompletableFuture.completedFuture(EconomyOpResult.failed(reject.get()));
-            }
-            return DataStore.INSTANCE.mutate(current -> {
-                ClaimData claim = claimAt(current, worldUuid, chunkX, chunkZ);
-                addBank(current, claim, -amount);
-                return DataStore.rebuildSnapshot();
-            }).thenCompose(next -> onMain(() -> economy.deposit(player, amount)).thenCompose(credited -> {
-                if (!credited) {
-                    // 银行已扣而入账失败：回滚银行
-                    return DataStore.INSTANCE.mutate(current -> {
-                        ClaimData claim = claimAt(current, worldUuid, chunkX, chunkZ);
-                        addBank(current, claim, amount);
-                        return DataStore.rebuildSnapshot();
-                    }).thenApply(s -> EconomyOpResult.failed(EconomyFailureReason.INVALID_AMOUNT));
-                }
-                double bank = bankBalanceAt(DataStore.INSTANCE.snapshot(), worldUuid, chunkX, chunkZ);
-                return CompletableFuture.completedFuture(
-                    EconomyOpResult.ok(amount, economy.balance(player), bank));
-            }));
-        });
+            double bank = bankBalanceAt(DataStore.INSTANCE.snapshot(), worldUuid, chunkX, chunkZ);
+            return CompletableFuture.completedFuture(
+                EconomyOpResult.ok(amount, economy.balance(player), bank));
+        }));
+    }
+
+    /**
+     * 银行余额落在领地行（个人/管理领地）或组行（用户组领地）上，按所有者类型声明实际改动的组件。
+     */
+    private static DataSnapshot reloadBank(DataSnapshot before, UUID worldUuid, int chunkX, int chunkZ)
+        throws SQLException {
+        ClaimData claim = claimAt(before, worldUuid, chunkX, chunkZ);
+        if (claim == null) {
+            return before;
+        }
+        if (BuiltinOwnerTypes.GROUP.equals(claim.getOwnerType())) {
+            return DataStore.reload(SnapshotPart.GROUP);
+        }
+        return DataStore.reloadScoped(SnapshotPart.CLAIM, claim.getClaimId());
     }
 
     // ================= 内部工具 =================

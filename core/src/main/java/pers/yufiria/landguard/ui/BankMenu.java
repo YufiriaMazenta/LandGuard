@@ -1,6 +1,5 @@
 package pers.yufiria.landguard.ui;
 
-import crypticlib.CrypticLibBukkit;
 import crypticlib.lang.entry.StringLangEntry;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.MenuDisplay;
@@ -13,6 +12,7 @@ import pers.yufiria.landguard.command.EconomyCommands;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.economy.EconomyService;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -110,10 +110,7 @@ public class BankMenu extends Menu {
         var future = deposit
             ? EconomyService.INSTANCE.deposit(player.getUniqueId(), worldUuid, chunkX, chunkZ, amount)
             : EconomyService.INSTANCE.withdraw(player.getUniqueId(), worldUuid, chunkX, chunkZ, amount);
-        future.whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
-            if (!player.isOnline() || throwable != null || result == null) {
-                return;
-            }
+        AsyncReply.toPlayer(player, future, result -> {
             if (result.success()) {
                 LangUtils.sendLang(player,
                     deposit ? Languages.COMMAND_BANK_DEPOSIT_SUCCESS : Languages.COMMAND_BANK_WITHDRAW_SUCCESS,
@@ -123,7 +120,7 @@ public class BankMenu extends Menu {
                 EconomyCommands.sendFail(CommandUtils.commonPlayer(player), result.failureReason());
             }
             updateMenu(true);
-        }));
+        });
     }
 
     @Override

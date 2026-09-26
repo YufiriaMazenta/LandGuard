@@ -58,36 +58,108 @@ public class ClaimData {
     public ClaimData() {
     }
 
-    public ClaimData(String claimId, UUID worldUuid, String ownerType, String ownerId, String name,
-                     boolean admin, long createdAt, long lastActiveAt, double bankBalance, boolean upkeepExempt) {
-        this(claimId, worldUuid, ownerType, ownerId, name, admin, createdAt, lastActiveAt,
-            bankBalance, upkeepExempt, 0L, 0L, 0L, 0L);
+    /** 具名构造入口：必填五项之外都可省略。 */
+    public static Builder builder(String claimId, UUID worldUuid, String ownerType, String ownerId, String name) {
+        return new Builder(claimId, worldUuid, ownerType, ownerId, name);
     }
 
-    public ClaimData(String claimId, UUID worldUuid, String ownerType, String ownerId, String name,
-                     boolean admin, long createdAt, long lastActiveAt, double bankBalance, boolean upkeepExempt,
-                     long upkeepChargedAt, long upkeepUnpaidSince, long inactiveWarnedAt) {
-        this(claimId, worldUuid, ownerType, ownerId, name, admin, createdAt, lastActiveAt,
-            bankBalance, upkeepExempt, upkeepChargedAt, upkeepUnpaidSince, inactiveWarnedAt, 0L);
-    }
+    /**
+     * 领地的具名构造器，取代原先的伸缩构造器。
+     * 缺省值与「新建领地」语义一致：非管理领地、创建/活跃时间取当前时间、银行余额 0、
+     * 不豁免维护费、生命周期时间戳全 0（未扣费、未欠费、未警告、非孤儿）。
+     */
+    public static final class Builder {
 
-    public ClaimData(String claimId, UUID worldUuid, String ownerType, String ownerId, String name,
-                     boolean admin, long createdAt, long lastActiveAt, double bankBalance, boolean upkeepExempt,
-                     long upkeepChargedAt, long upkeepUnpaidSince, long inactiveWarnedAt, long orphanSince) {
-        this.claimId = claimId;
-        this.worldUuid = worldUuid;
-        this.ownerType = ownerType;
-        this.ownerId = ownerId;
-        this.name = name;
-        this.admin = admin;
-        this.createdAt = createdAt;
-        this.lastActiveAt = lastActiveAt;
-        this.bankBalance = bankBalance;
-        this.upkeepExempt = upkeepExempt;
-        this.upkeepChargedAt = upkeepChargedAt;
-        this.upkeepUnpaidSince = upkeepUnpaidSince;
-        this.inactiveWarnedAt = inactiveWarnedAt;
-        this.orphanSince = orphanSince;
+        private final String claimId;
+        private final UUID worldUuid;
+        private final String ownerType;
+        private final String ownerId;
+        private final String name;
+        private boolean admin;
+        private long createdAt;
+        private long lastActiveAt;
+        private double bankBalance;
+        private boolean upkeepExempt;
+        private long upkeepChargedAt;
+        private long upkeepUnpaidSince;
+        private long inactiveWarnedAt;
+        private long orphanSince;
+
+        private Builder(String claimId, UUID worldUuid, String ownerType, String ownerId, String name) {
+            this.claimId = claimId;
+            this.worldUuid = worldUuid;
+            this.ownerType = ownerType;
+            this.ownerId = ownerId;
+            this.name = name;
+            long now = System.currentTimeMillis();
+            this.createdAt = now;
+            this.lastActiveAt = now;
+        }
+
+        public Builder admin(boolean admin) {
+            this.admin = admin;
+            return this;
+        }
+
+        public Builder createdAt(long createdAt) {
+            this.createdAt = createdAt;
+            return this;
+        }
+
+        public Builder lastActiveAt(long lastActiveAt) {
+            this.lastActiveAt = lastActiveAt;
+            return this;
+        }
+
+        public Builder bankBalance(double bankBalance) {
+            this.bankBalance = bankBalance;
+            return this;
+        }
+
+        public Builder upkeepExempt(boolean upkeepExempt) {
+            this.upkeepExempt = upkeepExempt;
+            return this;
+        }
+
+        public Builder upkeepChargedAt(long upkeepChargedAt) {
+            this.upkeepChargedAt = upkeepChargedAt;
+            return this;
+        }
+
+        public Builder upkeepUnpaidSince(long upkeepUnpaidSince) {
+            this.upkeepUnpaidSince = upkeepUnpaidSince;
+            return this;
+        }
+
+        public Builder inactiveWarnedAt(long inactiveWarnedAt) {
+            this.inactiveWarnedAt = inactiveWarnedAt;
+            return this;
+        }
+
+        public Builder orphanSince(long orphanSince) {
+            this.orphanSince = orphanSince;
+            return this;
+        }
+
+        public ClaimData build() {
+            ClaimData data = new ClaimData();
+            data.claimId = claimId;
+            data.worldUuid = worldUuid;
+            data.ownerType = ownerType;
+            data.ownerId = ownerId;
+            data.name = name;
+            data.admin = admin;
+            data.createdAt = createdAt;
+            data.lastActiveAt = lastActiveAt;
+            data.bankBalance = bankBalance;
+            data.upkeepExempt = upkeepExempt;
+            data.upkeepChargedAt = upkeepChargedAt;
+            data.upkeepUnpaidSince = upkeepUnpaidSince;
+            data.inactiveWarnedAt = inactiveWarnedAt;
+            data.orphanSince = orphanSince;
+            return data;
+        }
+
     }
 
     public String getClaimId() {

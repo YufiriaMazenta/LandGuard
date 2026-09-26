@@ -7,6 +7,7 @@ import crypticlib.lifecycle.LifecycleSchedule;
 import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
 import crypticlib.scheduler.TaskWrapper;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.admin.AdminService;
 import pers.yufiria.landguard.config.UpkeepConfigs;
 import pers.yufiria.landguard.util.ConfigValues;
@@ -24,8 +25,8 @@ import java.util.logging.Logger;
  */
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = 40),
-        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = 40),
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = LifecycleOrder.PERIODIC),
+        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = LifecycleOrder.PERIODIC),
         @LifecycleSchedule(phase = LifecyclePhase.DISABLE)
     }
 )

@@ -7,6 +7,7 @@ import crypticlib.lifecycle.LifecyclePhase;
 import crypticlib.lifecycle.LifecycleSchedule;
 import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.config.DatabaseConfigs;
 import pers.yufiria.landguard.database.exception.DatabaseLoadException;
 import pers.yufiria.landguard.database.loader.DataSourceLoader;
@@ -19,9 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, isAsync = true, priority = -2),
-        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, isAsync = true, priority = -2),
-        @LifecycleSchedule(phase = LifecyclePhase.DISABLE, priority = Integer.MAX_VALUE)
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, isAsync = true, priority = LifecycleOrder.DATABASE_SOURCE),
+        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, isAsync = true, priority = LifecycleOrder.DATABASE_SOURCE),
+        @LifecycleSchedule(phase = LifecyclePhase.DISABLE, priority = LifecycleOrder.LAST)
     }
 )
 public enum DataSourceManager implements LifecycleTask {

@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.data.ChunkLoc;
+import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotAudit;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
@@ -71,15 +73,19 @@ public class EconomyServiceIntegrationTest {
         EconomyService.INSTANCE.unhook();
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.GROUP));
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.PLAYER));
+        // 增量重载安全网：已发布快照必须与全量重读按值一致
+        SnapshotAudit.assertFresh(DataStore.INSTANCE.snapshot());
         DataStore.INSTANCE.joinReload();
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
         connection.close();
     }
 
     private void createPersonalClaim(UUID owner, int cx, int cz) throws Exception {
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, BuiltinOwnerTypes.PLAYER, owner.toString(), "Home", false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, BuiltinOwnerTypes.PLAYER, owner.toString(), "Home")
+            .createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, cx, cz));
         DataStore.INSTANCE.reloadFrom(connection).join();
     }
@@ -176,8 +182,8 @@ public class EconomyServiceIntegrationTest {
         String groupId = created.groupId();
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, BuiltinOwnerTypes.GROUP, groupId, "GH", false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, BuiltinOwnerTypes.GROUP, groupId, "GH").createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, 2, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
 

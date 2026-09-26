@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -14,6 +13,7 @@ import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.ConfigValues;
 import pers.yufiria.landguard.util.LangUtils;
@@ -77,18 +77,14 @@ public final class ClaimCommand extends CommandNode {
         List<ChunkLoc> targets = ClaimEngine.radiusTargets(
             bukkitPlayer.getWorld().getUID(), bukkitPlayer.getLocation().getBlockX() >> 4, bukkitPlayer.getLocation().getBlockZ() >> 4, radius);
         OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
-        ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, player.name(), false)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
-                }
-                if (result.success()) {
-                    ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
-                    ClaimMessages.claimSuccess(player, result);
-                } else {
-                    ClaimMessages.failure(player, result.failureReason());
-                }
-            }));
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, player.name(), false), result -> {
+            if (result.success()) {
+                ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
+                ClaimMessages.claimSuccess(player, result);
+            } else {
+                ClaimMessages.failure(player, result.failureReason());
+            }
+        });
     }
 
     @Override

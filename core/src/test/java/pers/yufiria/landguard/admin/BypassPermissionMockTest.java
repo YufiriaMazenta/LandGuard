@@ -62,7 +62,7 @@ public class BypassPermissionMockTest {
         PluginManager pm = MockBukkit.getMock().getPluginManager();
         pm.addPermission(new Permission(ProtectionPermissions.BYPASS, PermissionDefault.FALSE));
         ClaimOwnerRegistry.INSTANCE.register(PlayerClaimOwnerProvider.INSTANCE);
-        publishSnapshot(playerClaimSnapshot());
+        DataStore.INSTANCE.publish(playerClaimSnapshot());
         installPluginInstance();
         alice = new PlayerMock(MockBukkit.getMock(), "Alice", ALICE);
         admin = new PlayerMock(MockBukkit.getMock(), "Opal", ADMIN);
@@ -73,14 +73,9 @@ public class BypassPermissionMockTest {
     @AfterEach
     void tearDown() throws Exception {
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.PLAYER));
-        publishSnapshot(DataSnapshot.empty());
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
+        restorePluginInstance();
         MockBukkit.unmock();
-    }
-
-    private static void publishSnapshot(DataSnapshot snapshot) throws Exception {
-        Field field = DataStore.class.getDeclaredField("snapshot");
-        field.setAccessible(true);
-        field.set(DataStore.INSTANCE, snapshot);
     }
 
     private static void installPluginInstance() throws Exception {
@@ -93,10 +88,17 @@ public class BypassPermissionMockTest {
         instanceField.set(null, pluginMock);
     }
 
+    /** 还原静态插件实例，避免 mock 残留污染其他测试类。 */
+    private static void restorePluginInstance() throws Exception {
+        Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
+        instanceField.setAccessible(true);
+        instanceField.set(null, null);
+    }
+
     private DataSnapshot playerClaimSnapshot() {
         long now = System.currentTimeMillis();
-        ClaimData claim = new ClaimData("A", world.getUID(), BuiltinOwnerTypes.PLAYER,
-            ALICE.toString(), "Home", false, now, now, 0, false);
+        ClaimData claim = ClaimData.builder("A", world.getUID(), BuiltinOwnerTypes.PLAYER,
+            ALICE.toString(), "Home").createdAt(now).lastActiveAt(now).build();
         Map<String, ClaimData> byId = new LinkedHashMap<>();
         byId.put("A", claim);
         Map<ChunkLoc, String> byChunk = new LinkedHashMap<>();

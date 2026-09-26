@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotAudit;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.PlayerData;
 import pers.yufiria.landguard.database.entity.PlayerQuotaData;
@@ -54,6 +55,9 @@ public class ClaimLifecycleIntegrationTest {
     @AfterEach
     void tearDown() throws Exception {
         DataStore.INSTANCE.joinReload();
+        // 增量重载安全网：已发布快照必须与全量重读按值一致，收尾再清空
+        SnapshotAudit.assertFresh(DataStore.INSTANCE.snapshot());
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
         connection.close();
     }
 
@@ -113,6 +117,8 @@ public class ClaimLifecycleIntegrationTest {
         PlayerData dataA = LandDaoManager.INSTANCE.playerDao().queryForId(playerA);
         dataA.setAccruedChunks(0);
         LandDaoManager.INSTANCE.playerDao().update(dataA);
+        // 直改 DAO 后必须重新发布快照，保持「快照 == 数据库」不变量
+        DataStore.INSTANCE.reloadFrom(connection).join();
         ClaimOpResult noQuota = ClaimService.INSTANCE.claim(
             ownerA, world, List.of(loc(0, 0)), "home", false).join();
         assertEquals(ClaimFailureReason.QUOTA_EXCEEDED, noQuota.failureReason());

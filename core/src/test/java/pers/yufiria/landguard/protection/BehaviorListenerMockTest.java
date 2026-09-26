@@ -71,7 +71,7 @@ public class BehaviorListenerMockTest {
         register(pm, EntityProtectionListener.INSTANCE);
         register(pm, NaturalProtectionListener.INSTANCE);
         ClaimOwnerRegistry.INSTANCE.register(PlayerClaimOwnerProvider.INSTANCE);
-        publishSnapshot(playerClaimSnapshot());
+        DataStore.INSTANCE.publish(playerClaimSnapshot());
         installPluginInstance();
         alice = new PlayerMock(MockBukkit.getMock(), "Alice", ALICE);
         outsider = new PlayerMock(MockBukkit.getMock(), "Dave", OUTSIDER);
@@ -84,19 +84,21 @@ public class BehaviorListenerMockTest {
         }
         registered.clear();
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.PLAYER));
-        publishSnapshot(DataSnapshot.empty());
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
+        restorePluginInstance();
         MockBukkit.unmock();
+    }
+
+    /** 还原静态插件实例，避免 mock 残留污染其他测试类。 */
+    private static void restorePluginInstance() throws Exception {
+        Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
+        instanceField.setAccessible(true);
+        instanceField.set(null, null);
     }
 
     private void register(PluginManager pm, Listener listener) {
         pm.registerEvents(listener, plugin);
         registered.add(listener);
-    }
-
-    private static void publishSnapshot(DataSnapshot snapshot) throws Exception {
-        Field field = DataStore.class.getDeclaredField("snapshot");
-        field.setAccessible(true);
-        field.set(DataStore.INSTANCE, snapshot);
     }
 
     private static void installPluginInstance() throws Exception {
@@ -112,8 +114,8 @@ public class BehaviorListenerMockTest {
 
     private DataSnapshot playerClaimSnapshot() {
         long now = System.currentTimeMillis();
-        ClaimData claim = new ClaimData("A", world.getUID(), BuiltinOwnerTypes.PLAYER,
-            ALICE.toString(), "Home", false, now, now, 0, false);
+        ClaimData claim = ClaimData.builder("A", world.getUID(), BuiltinOwnerTypes.PLAYER,
+            ALICE.toString(), "Home").createdAt(now).lastActiveAt(now).build();
         Map<String, ClaimData> byId = new LinkedHashMap<>();
         byId.put("A", claim);
         Map<ChunkLoc, String> byChunk = new LinkedHashMap<>();

@@ -105,9 +105,9 @@ public class ClaimMenuMockTest {
 
         long now = System.currentTimeMillis();
         LandDaoManager.INSTANCE.playerDao().create(new PlayerData(ALICE, 64, 0, now));
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            "A", world.getUID(), BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home",
-            false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            "A", world.getUID(), BuiltinOwnerTypes.PLAYER, ALICE.toString(), "Home")
+            .createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(
             new ClaimChunkData("A", world.getUID(), 0, 0));
         DataStore.INSTANCE.reloadFrom(connection).join();
@@ -122,6 +122,7 @@ public class ClaimMenuMockTest {
         Field pluginField = SpigotScheduler.class.getDeclaredField("plugin");
         pluginField.setAccessible(true);
         pluginField.set(SpigotScheduler.INSTANCE, null);
+        restorePluginInstance();
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.GROUP));
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.PLAYER));
         DataStore.INSTANCE.joinReload();
@@ -137,6 +138,13 @@ public class ClaimMenuMockTest {
         Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
         instanceField.setAccessible(true);
         instanceField.set(null, pluginMock);
+    }
+
+    /** 还原静态插件实例，避免 mock 残留污染其他测试类。 */
+    private static void restorePluginInstance() throws Exception {
+        Field instanceField = LandGuard.class.getDeclaredField("INSTANCE");
+        instanceField.setAccessible(true);
+        instanceField.set(null, null);
     }
 
     private static void setConfig(ConfigNode<?, ?> node, Object value) throws Exception {

@@ -34,8 +34,8 @@ public class PersistenceRoundTripTest {
         LandDaoManager.INSTANCE.init(first);
         LandDaoManager daos = LandDaoManager.INSTANCE;
 
-        daos.claimDao().create(new ClaimData(claimId, world, "player", player.toString(),
-            "home", false, 1000L, 2000L, 12.5, false));
+        daos.claimDao().create(ClaimData.builder(claimId, world, "player", player.toString(), "home")
+            .createdAt(1000L).lastActiveAt(2000L).bankBalance(12.5).build());
         daos.claimChunkDao().create(new ClaimChunkData(claimId, world, 3, -7));
         daos.claimChunkDao().create(new ClaimChunkData(claimId, world, 3, -6));
         daos.roleFlagDao().create(new ClaimRoleFlagData(claimId, "member", "CONTAINER", false));

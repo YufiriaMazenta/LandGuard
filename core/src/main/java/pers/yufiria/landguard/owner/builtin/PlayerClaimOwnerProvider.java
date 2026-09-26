@@ -10,6 +10,7 @@ import pers.yufiria.landguard.owner.OwnerType;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 内置 {@code player} 类型提供方。
@@ -21,6 +22,13 @@ public enum PlayerClaimOwnerProvider implements ClaimOwnerProvider {
 
     private static final OwnerType TYPE = new OwnerType(BuiltinOwnerTypes.PLAYER);
 
+    /**
+     * 保护判定每个事件都会解析所有者；玩家 owner 是 UUID 的纯函数（不可变 record），
+     * 缓存可省掉每事件的 UUID 解析与对象分配，且不存在失效问题。
+     * 键空间等于曾拥有领地的玩家数，量级可控。
+     */
+    private final ConcurrentHashMap<String, PlayerClaimOwner> cache = new ConcurrentHashMap<>();
+
     @Override
     public @NotNull OwnerType type() {
         return TYPE;
@@ -28,16 +36,22 @@ public enum PlayerClaimOwnerProvider implements ClaimOwnerProvider {
 
     @Override
     public @Nullable ClaimOwner getOwner(@NotNull String identifier) {
+        PlayerClaimOwner cached = cache.get(identifier);
+        if (cached != null) {
+            return cached;
+        }
         UUID uuid = parseUuid(identifier);
         if (uuid == null) {
             return null;
         }
-        return new PlayerClaimOwner(uuid);
+        PlayerClaimOwner owner = new PlayerClaimOwner(uuid);
+        cache.putIfAbsent(identifier, owner);
+        return owner;
     }
 
     @Override
     public @NotNull Collection<ClaimOwner> ownersOf(@NotNull UUID player) {
-        return List.of(new PlayerClaimOwner(player));
+        return List.of(cache.computeIfAbsent(player.toString(), key -> new PlayerClaimOwner(player)));
     }
 
     /**

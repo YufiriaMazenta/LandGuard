@@ -44,6 +44,10 @@ public class AutoModeManagerTest {
         AutoModeManager.INSTANCE.toggle(first, AutoModeManager.Mode.CLAIM);
         assertEquals(AutoModeManager.Mode.OFF, AutoModeManager.INSTANCE.modeOf(first));
         assertEquals(AutoModeManager.Mode.UNCLAIM, AutoModeManager.INSTANCE.modeOf(second));
+
+        // 收尾把状态切回关闭：单例状态跨测试类共享，不留残影
+        AutoModeManager.INSTANCE.toggle(second, AutoModeManager.Mode.UNCLAIM);
+        assertEquals(AutoModeManager.Mode.OFF, AutoModeManager.INSTANCE.modeOf(second));
     }
 
 }

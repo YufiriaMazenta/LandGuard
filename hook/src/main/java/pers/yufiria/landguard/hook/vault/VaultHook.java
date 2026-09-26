@@ -7,6 +7,7 @@ import crypticlib.lifecycle.LifecycleTask;
 import crypticlib.lifecycle.LifecycleTaskConfig;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.economy.EconomyProvider;
 import pers.yufiria.landguard.economy.EconomyService;
@@ -22,8 +23,8 @@ import java.util.Map;
  */
 @LifecycleTaskConfig(
     schedules = {
-        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = 20),
-        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = 20),
+        @LifecycleSchedule(phase = LifecyclePhase.ACTIVE, priority = LifecycleOrder.ECONOMY_HOOK),
+        @LifecycleSchedule(phase = LifecyclePhase.RELOAD, priority = LifecycleOrder.ECONOMY_HOOK),
         @LifecycleSchedule(phase = LifecyclePhase.DISABLE)
     }
 )

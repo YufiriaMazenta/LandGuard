@@ -72,8 +72,8 @@ public class ProtectionChainTest {
 
     private DataSnapshot guildSnapshot(Map<String, Map<String, Map<String, Boolean>>> flagsByClaim) {
         long now = System.currentTimeMillis();
-        ClaimData c1 = new ClaimData("c1", WORLD, GUILD_TYPE.key(), "g", "C1", false, now, now, 0, false);
-        ClaimData c2 = new ClaimData("c2", WORLD, GUILD_TYPE.key(), "g", "C2", false, now, now, 0, false);
+        ClaimData c1 = ClaimData.builder("c1", WORLD, GUILD_TYPE.key(), "g", "C1").createdAt(now).lastActiveAt(now).build();
+        ClaimData c2 = ClaimData.builder("c2", WORLD, GUILD_TYPE.key(), "g", "C2").createdAt(now).lastActiveAt(now).build();
         Map<UUID, String> notUsed = Map.of();
         return snapshotWithClaims(List.of(c1, c2), flagsByClaim);
     }
@@ -189,9 +189,9 @@ public class ProtectionChainTest {
         long now = System.currentTimeMillis();
         // 两领地归测试组织所有；BOB 在其中是 member（容器默认拒绝），用于验证覆盖只作用于 c1
         LandDaoManager.INSTANCE.claimDao().create(
-            new ClaimData("c1", WORLD, GUILD_TYPE.key(), "g", "C1", false, now, now, 0, false));
+            ClaimData.builder("c1", WORLD, GUILD_TYPE.key(), "g", "C1").createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimDao().create(
-            new ClaimData("c2", WORLD, GUILD_TYPE.key(), "g", "C2", false, now, now, 0, false));
+            ClaimData.builder("c2", WORLD, GUILD_TYPE.key(), "g", "C2").createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(
             new ClaimChunkData("c1", WORLD, 0, 0));
         LandDaoManager.INSTANCE.claimChunkDao().create(

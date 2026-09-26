@@ -13,6 +13,7 @@ import crypticlib.perm.PermInfo;
 import crypticlib.scheduler.CrypticLibRunnable;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import pers.yufiria.landguard.LifecycleOrder;
 import pers.yufiria.landguard.LandGuard;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.util.LangUtils;
@@ -23,7 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @LifecycleTaskConfig(schedules = @LifecycleSchedule(
     phase = LifecyclePhase.RELOAD,
-    priority = Integer.MAX_VALUE,
+    priority = LifecycleOrder.LAST,
     isAsync = true
 ))
 public final class ReloadCommand extends CommandNode implements LifecycleTask {

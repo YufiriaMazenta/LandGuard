@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.ui;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.conversation.Conversation;
 import crypticlib.conversation.Prompt;
 import crypticlib.lang.entry.StringLangEntry;
@@ -29,6 +28,7 @@ import pers.yufiria.landguard.economy.EconomyService;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -182,23 +182,19 @@ public class ClaimDetailMenu extends Menu {
             player.getLocation().getBlockX() >> 4,
             player.getLocation().getBlockZ() >> 4
         );
-        ClaimService.INSTANCE.unclaimOwnedBy(player.getUniqueId(), standing)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
-                if (!player.isOnline() || throwable != null || result == null) {
-                    return;
-                }
-                if (result.success()) {
-                    ClaimMessages.unclaimSuccess(CommandUtils.commonPlayer(player), result);
-                } else {
-                    ClaimMessages.failure(CommandUtils.commonPlayer(player), result.failureReason());
-                }
-                // 整块领地下最后一个区块被放弃时返回列表，否则刷新本页
-                if (DataStore.INSTANCE.snapshot().claimsById().containsKey(claimId)) {
-                    new ClaimDetailMenu(player, claimId, listPage).openMenu();
-                } else {
-                    new ClaimListMenu(player, listPage).openMenu();
-                }
-            }));
+        AsyncReply.toPlayer(player, ClaimService.INSTANCE.unclaimOwnedBy(player.getUniqueId(), standing), result -> {
+            if (result.success()) {
+                ClaimMessages.unclaimSuccess(CommandUtils.commonPlayer(player), result);
+            } else {
+                ClaimMessages.failure(CommandUtils.commonPlayer(player), result.failureReason());
+            }
+            // 整块领地下最后一个区块被放弃时返回列表，否则刷新本页
+            if (DataStore.INSTANCE.snapshot().claimsById().containsKey(claimId)) {
+                new ClaimDetailMenu(player, claimId, listPage).openMenu();
+            } else {
+                new ClaimListMenu(player, listPage).openMenu();
+            }
+        });
     }
 
     @Override
@@ -224,19 +220,15 @@ public class ClaimDetailMenu extends Menu {
             if (!(input instanceof String raw)) {
                 return;
             }
-            ClaimService.INSTANCE.renameClaim(player.getUniqueId(), claimId, raw)
-                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(player, () -> {
-                    if (!player.isOnline() || throwable != null || result == null) {
-                        return;
-                    }
-                    if (result.success()) {
-                        LangUtils.sendLang(commonPlayer, Languages.COMMAND_RENAME_SUCCESS,
-                            Map.of("<name>", ClaimService.normalizeClaimName(raw)));
-                        new ClaimDetailMenu(player, claimId, listPage).openMenu();
-                    } else {
-                        ClaimMessages.failure(commonPlayer, result.failureReason());
-                    }
-                }));
+            AsyncReply.toPlayer(player, ClaimService.INSTANCE.renameClaim(player.getUniqueId(), claimId, raw), result -> {
+                if (result.success()) {
+                    LangUtils.sendLang(commonPlayer, Languages.COMMAND_RENAME_SUCCESS,
+                        Map.of("<name>", ClaimService.normalizeClaimName(raw)));
+                    new ClaimDetailMenu(player, claimId, listPage).openMenu();
+                } else {
+                    ClaimMessages.failure(commonPlayer, result.failureReason());
+                }
+            });
         }).start();
     }
 

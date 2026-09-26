@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.claim;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.listener.EventListener;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -11,6 +10,7 @@ import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 
 import java.util.List;
@@ -28,7 +28,7 @@ public enum AutoModeManager implements Listener {
 
     INSTANCE;
 
-    /** 行走自动模式：关闭 / 进入新区块自动认领 / 进入新区块自动放弃本人领地。 */
+    /** 行走自动模式：关闭 / 进入新区块自动认领 / 进入新区块自动放弃（本人的个人领地，或本人担任领袖的组领地）。 */
     public enum Mode {
         OFF, CLAIM, UNCLAIM
     }
@@ -90,44 +90,26 @@ public enum AutoModeManager implements Listener {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
         List<ChunkLoc> targets = List.of(target);
-        ClaimService.INSTANCE.claim(owner, target.worldUuid(), targets, player.name(), false)
-            .whenComplete((result, throwable) -> {
-                if (throwable != null || result == null) {
-                    return;
-                }
-                CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                    if (!bukkitPlayer.isOnline()) {
-                        return;
-                    }
-                    if (result.success()) {
-                        if (result.affectedChunks() == 0) {
-                            return;
-                        }
-                        ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
-                        ClaimMessages.claimSuccess(player, result);
-                    } else if (result.failureReason() != ClaimFailureReason.OVERLAP
-                        && shouldNotify(player.uniqueId())) {
-                        ClaimMessages.failure(player, result.failureReason());
-                    }
-                });
-            });
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.claim(owner, target.worldUuid(), targets, player.name(), false), result -> {
+            if (result.success()) {
+                ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
+                ClaimMessages.claimSuccess(player, result);
+            } else if (result.failureReason() != ClaimFailureReason.OVERLAP
+                && shouldNotify(player.uniqueId())) {
+                ClaimMessages.failure(player, result.failureReason());
+            }
+        });
     }
 
     private void attemptUnclaim(CommonPlayer player, ChunkLoc target) {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         // 授权交给 ClaimService：野外与他人领地返回失败，这里静默跳过不提示
-        ClaimService.INSTANCE.unclaimOwnedBy(player.uniqueId(), target)
-            .whenComplete((result, throwable) -> {
-                if (throwable != null || result == null || !result.success()) {
-                    return;
-                }
-                CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                    if (!bukkitPlayer.isOnline()) {
-                        return;
-                    }
-                    ClaimMessages.unclaimSuccess(player, result);
-                });
-            });
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.unclaimOwnedBy(player.uniqueId(), target), result -> {
+            if (!result.success()) {
+                return;
+            }
+            ClaimMessages.unclaimSuccess(player, result);
+        });
     }
 
     private boolean shouldNotify(UUID uuid) {

@@ -13,9 +13,11 @@ import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.data.SnapshotAudit;
 import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
+import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.owner.*;
 import pers.yufiria.landguard.owner.builtin.PlayerClaimOwnerProvider;
 import pers.yufiria.landguard.owner.builtin.group.GroupClaimOwnerProvider;
@@ -82,7 +84,10 @@ public class GroupLifecycleIntegrationTest {
         ClaimOwnerRegistry.INSTANCE.removeListener(listener);
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.GROUP));
         ClaimOwnerRegistry.INSTANCE.unregister(new OwnerType(BuiltinOwnerTypes.PLAYER));
+        // 增量重载安全网：已发布快照必须与全量重读按值一致
+        SnapshotAudit.assertFresh(DataStore.INSTANCE.snapshot());
         DataStore.INSTANCE.joinReload();
+        DataStore.INSTANCE.publish(DataSnapshot.empty());
         connection.close();
     }
 
@@ -95,8 +100,9 @@ public class GroupLifecycleIntegrationTest {
     private void placeGroupClaim(String groupId, int cx, int cz) throws Exception {
         String claimId = UUID.randomUUID().toString();
         long now = System.currentTimeMillis();
-        LandDaoManager.INSTANCE.claimDao().create(new ClaimData(
-            claimId, world, BuiltinOwnerTypes.GROUP, groupId, "GuildHome", false, now, now, 0D, false));
+        LandDaoManager.INSTANCE.claimDao().create(ClaimData.builder(
+            claimId, world, BuiltinOwnerTypes.GROUP, groupId, "GuildHome")
+            .createdAt(now).lastActiveAt(now).build());
         LandDaoManager.INSTANCE.claimChunkDao().create(new ClaimChunkData(claimId, world, cx, cz));
         DataStore.INSTANCE.reloadFrom(connection).join();
     }
@@ -257,6 +263,24 @@ public class GroupLifecycleIntegrationTest {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
         assertFalse(snapshot.claimIdByChunk().containsKey(target));
         assertTrue(snapshot.claimsById().isEmpty());
+    }
+
+    @Test
+    void leadershipTransferDoesNotMutatePublishedSnapshot() throws Exception {
+        String groupId = createGuild();
+        assertTrue(GroupService.INSTANCE.invite(ALICE, "Guild", CAROL).join().success());
+        assertTrue(GroupService.INSTANCE.acceptInvite(CAROL, "Guild").join().success());
+
+        DataSnapshot before = DataStore.INSTANCE.snapshot();
+        GroupData beforeGroup = before.groups().get(groupId);
+        assertEquals(ALICE, beforeGroup.getLeaderUuid());
+
+        assertTrue(GroupService.INSTANCE.transferLeadership(ALICE, "Guild", CAROL).join().success());
+
+        // 已发布的旧快照必须保持不变：转让只允许改数据库副本，不得就地改写快照里的实例
+        assertSame(beforeGroup, before.groups().get(groupId));
+        assertEquals(ALICE, beforeGroup.getLeaderUuid(), "旧快照内的领袖被就地改写了");
+        assertEquals(CAROL, DataStore.INSTANCE.snapshot().groups().get(groupId).getLeaderUuid());
     }
 
     private static List<ChunkLoc> square(UUID worldUuid, int size) {

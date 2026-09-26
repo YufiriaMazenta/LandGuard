@@ -1,7 +1,6 @@
 package pers.yufiria.landguard.command;
 
 import crypticlib.CommonPlayer;
-import crypticlib.CrypticLibBukkit;
 import crypticlib.Invoker;
 import crypticlib.command.CommandInfo;
 import crypticlib.command.CommandNode;
@@ -16,6 +15,7 @@ import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.group.GroupService;
+import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
 
@@ -107,19 +107,15 @@ public final class TransferCommand extends CommandNode {
                 LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_FAIL_PLAYER_NOT_FOUND);
                 return;
             }
-            ClaimService.INSTANCE.transferClaim(player.uniqueId(), claimId, target)
-                .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                    if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                        return;
-                    }
-                    if (result.success()) {
-                        LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_SUCCESS,
-                            Map.of("<player>", playerName));
-                        runQuietly(onSuccess);
-                    } else {
-                        ClaimMessages.failure(player, result.failureReason());
-                    }
-                }));
+            AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.transferClaim(player.uniqueId(), claimId, target), result -> {
+                if (result.success()) {
+                    LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_SUCCESS,
+                        Map.of("<player>", playerName));
+                    runQuietly(onSuccess);
+                } else {
+                    ClaimMessages.failure(player, result.failureReason());
+                }
+            });
             return;
         }
         GroupData group = GroupService.findById(DataStore.INSTANCE.snapshot(), groupName);
@@ -127,22 +123,18 @@ public final class TransferCommand extends CommandNode {
             LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_FAIL_GROUP_NOT_FOUND);
             return;
         }
-        GroupService.INSTANCE.giveClaim(player.uniqueId(), group.getName(),
+        AsyncReply.toPlayer(bukkitPlayer, GroupService.INSTANCE.giveClaim(player.uniqueId(), group.getName(),
                 bukkitPlayer.getWorld().getUID(),
                 bukkitPlayer.getLocation().getBlockX() >> 4,
-                bukkitPlayer.getLocation().getBlockZ() >> 4)
-            .whenComplete((result, throwable) -> CrypticLibBukkit.scheduler().runOnEntity(bukkitPlayer, () -> {
-                if (!bukkitPlayer.isOnline() || throwable != null || result == null) {
-                    return;
-                }
-                if (result.success()) {
-                    LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_GROUP_SUCCESS,
-                        Map.of("<group>", group.getName()));
-                    runQuietly(onSuccess);
-                } else {
-                    GroupCommand.sendFailure(player, result);
-                }
-            }));
+                bukkitPlayer.getLocation().getBlockZ() >> 4), result -> {
+            if (result.success()) {
+                LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_GROUP_SUCCESS,
+                    Map.of("<group>", group.getName()));
+                runQuietly(onSuccess);
+            } else {
+                GroupCommand.sendFailure(player, result);
+            }
+        });
     }
 
     private static @Nullable String standingClaimId(Player player) {
