@@ -12,8 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * 子命令节点树结构回归：{@code @Subcommand} 字段由框架 {@code scanNodes()} 递归收集。
- * 保证 /land group 与 /land admin 的每个动作都是独立节点（独立权限节点、独立补全），
- * 且二级节点（role）的子动作同样被递归注册。
+ * 保证 /land claim、/land unclaim、/land group 与 /land admin 的每个分支/动作都是独立节点
+ * （独立权限节点、独立补全），且二级节点（role）的子动作同样被递归注册。
  */
 public class CommandTreeStructureTest {
 
@@ -25,6 +25,32 @@ public class CommandTreeStructureTest {
     private static final List<String> ADMIN_ACTIONS = List.of(
         "claim", "unclaim", "transfer", "release", "exempt", "rename", "info", "orphans", "run"
     );
+
+    private static final List<String> CLAIM_ACTIONS = List.of("auto", "radius");
+
+    @Test
+    void claimCommandExposesBranchesAsNodes() {
+        ClaimCommand claim = ClaimCommand.INSTANCE;
+        claim.scanNodes();
+
+        assertEquals(Set.copyOf(CLAIM_ACTIONS), claim.nodes().keySet());
+        // 三种形态是同一能力的变体，共用根节点权限，避免只授过根权限的服务器失去子命令
+        for (String action : CLAIM_ACTIONS) {
+            assertEquals("landguard.command.claim",
+                claim.nodes().get(action).commandInfo().permission().permission(),
+                "claim 分支 " + action + " 应沿用根节点权限");
+        }
+    }
+
+    @Test
+    void unclaimCommandExposesAutoAsNode() {
+        UnclaimCommand unclaim = UnclaimCommand.INSTANCE;
+        unclaim.scanNodes();
+
+        assertEquals(Set.of("auto"), unclaim.nodes().keySet());
+        assertEquals("landguard.command.unclaim",
+            unclaim.nodes().get("auto").commandInfo().permission().permission());
+    }
 
     @Test
     void groupCommandExposesEveryActionAsNode() {
