@@ -20,11 +20,14 @@ public enum GroupFailureReason {
     NO_INVITE,
     LEADER_CANNOT_LEAVE,
     CANNOT_KICK,
-    ROLE_EXISTS,
-    ROLE_NOT_FOUND,
-    ROLE_ID_INVALID,
-    ROLE_BUILTIN,
+    /** 身份不足以指派该成员（越级指派、指派领袖身份或改动自己） */
+    CANNOT_ASSIGN,
+    IDENTITY_NOT_FOUND,
     CLAIM_NOT_FOUND,
-    NOT_CLAIM_OWNER
+    NOT_CLAIM_OWNER,
+    /** 目标用户组在该世界已有领地（不合并，避免同一所有者同世界多块地） */
+    GROUP_HAS_CLAIM,
+    /** 目标用户组的区块额度不足以接收这块领地 */
+    GROUP_QUOTA_EXCEEDED
 
 }

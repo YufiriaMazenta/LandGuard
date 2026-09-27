@@ -11,6 +11,9 @@ import pers.yufiria.landguard.claim.*;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.ChunkLoc;
+import pers.yufiria.landguard.data.DataStore;
+import pers.yufiria.landguard.database.entity.GroupData;
+import pers.yufiria.landguard.group.GroupService;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
 import pers.yufiria.landguard.util.AsyncReply;
@@ -25,6 +28,9 @@ public final class ClaimCommand extends CommandNode {
 
     public static final ClaimCommand INSTANCE = new ClaimCommand();
 
+    /** 认领身份标志：给出则以该用户组身份认领（缺省为本人）。 */
+    public static final String FLAG_GROUP = "--group";
+
     private ClaimCommand() {
         super(CommandInfo.builder("claim").permission(new PermInfo("landguard.command.claim")).build());
     }
@@ -38,27 +44,44 @@ public final class ClaimCommand extends CommandNode {
         // 仅世界/坐标与实体区域调度需要 Bukkit 玩家，其余一律走 crypticlib 对象
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
 
-        if (!args.isEmpty() && args.get(0).equalsIgnoreCase("auto")) {
-            AutoModeManager.Mode mode = AutoModeManager.INSTANCE.toggle(
-                player.uniqueId(), AutoModeManager.Mode.CLAIM);
-            LangUtils.sendLang(player, mode == AutoModeManager.Mode.CLAIM
+        // 标志可出现在任意位置：先剥掉 --group 再做位置参数解析
+        String groupIdArg = CommandUtils.parseFlag(args, FLAG_GROUP);
+        List<String> positional = CommandUtils.withoutValueFlag(args, FLAG_GROUP);
+        // 裸 --group（标志后没有值）不静默降级成「以本人身份认领」，否则玩家会误以为认到了组名下
+        if (groupIdArg == null && CommandUtils.hasFlag(args, FLAG_GROUP)) {
+            LangUtils.sendLang(player, Languages.COMMAND_CLAIM_USAGE);
+            return;
+        }
+        GroupData group = null;
+        if (groupIdArg != null) {
+            group = GroupService.findById(DataStore.INSTANCE.snapshot(), groupIdArg);
+            if (group == null) {
+                LangUtils.sendLang(player, Languages.COMMAND_CLAIM_GROUP_NOT_FOUND);
+                return;
+            }
+        }
+
+        if (!positional.isEmpty() && positional.get(0).equalsIgnoreCase("auto")) {
+            AutoModeManager.AutoState state = AutoModeManager.INSTANCE.toggle(
+                player.uniqueId(), AutoModeManager.Mode.CLAIM, group == null ? null : group.getGroupId());
+            LangUtils.sendLang(player, state.mode() == AutoModeManager.Mode.CLAIM
                 ? Languages.COMMAND_CLAIM_AUTO_ON
                 : Languages.COMMAND_CLAIM_AUTO_OFF);
             return;
         }
 
         int radius = 1;
-        if (!args.isEmpty()) {
-            if (!args.get(0).equalsIgnoreCase("radius")) {
+        if (!positional.isEmpty()) {
+            if (!positional.get(0).equalsIgnoreCase("radius")) {
                 LangUtils.sendLang(player, Languages.COMMAND_CLAIM_USAGE);
                 return;
             }
-            if (args.size() < 2) {
+            if (positional.size() < 2) {
                 LangUtils.sendLang(player, Languages.COMMAND_CLAIM_RADIUS_INVALID);
                 return;
             }
             try {
-                radius = Integer.parseInt(args.get(1));
+                radius = Integer.parseInt(positional.get(1));
             } catch (NumberFormatException e) {
                 LangUtils.sendLang(player, Languages.COMMAND_CLAIM_RADIUS_INVALID);
                 return;
@@ -76,8 +99,11 @@ public final class ClaimCommand extends CommandNode {
 
         List<ChunkLoc> targets = ClaimEngine.radiusTargets(
             bukkitPlayer.getWorld().getUID(), bukkitPlayer.getLocation().getBlockX() >> 4, bukkitPlayer.getLocation().getBlockZ() >> 4, radius);
-        OwnerRef owner = OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString());
-        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, player.name(), false), result -> {
+        OwnerRef owner = group == null
+            ? OwnerRef.of(BuiltinOwnerTypes.PLAYER, player.uniqueId().toString())
+            : OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId());
+        String defaultName = group == null ? player.name() : group.getName();
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.claim(owner, bukkitPlayer.getWorld().getUID(), targets, defaultName, false, player.uniqueId()), result -> {
             if (result.success()) {
                 ClaimBoundaryVisualizer.show(bukkitPlayer, targets);
                 ClaimMessages.claimSuccess(player, result);
@@ -94,7 +120,14 @@ public final class ClaimCommand extends CommandNode {
 
     @Override
     public List<String> tabComplete(@NotNull Invoker invoker, @NotNull List<String> args) {
-        return args.size() == 1 ? List.of("auto", "radius") : List.of();
+        if (args.size() == 1) {
+            return List.of("auto", "radius", FLAG_GROUP);
+        }
+        // 标志后可出现在任意位置：补全 --group 的取值
+        if (args.size() >= 2 && args.get(args.size() - 2).equalsIgnoreCase(FLAG_GROUP) && invoker.isPlayer()) {
+            return CommandCompletions.expandableGroups(invoker.asPlayer().uniqueId());
+        }
+        return List.of();
     }
 
 }

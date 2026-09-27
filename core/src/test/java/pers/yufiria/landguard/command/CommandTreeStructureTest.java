@@ -41,7 +41,7 @@ public class CommandTreeStructureTest {
         group.scanNodes();
 
         CommandNode role = group.nodes().get("role");
-        assertEquals(Set.of("create", "assign"), role.nodes().keySet());
+        assertEquals(Set.of("assign", "list"), role.nodes().keySet());
         assertEquals("landguard.command.group.role", role.commandInfo().permission().permission());
     }
 
@@ -62,7 +62,7 @@ public class CommandTreeStructureTest {
 
         CommandNode group = root.nodes().get("group");
         assertEquals(Set.copyOf(GROUP_ACTIONS), group.nodes().keySet());
-        assertEquals(Set.of("create", "assign"), group.nodes().get("role").nodes().keySet());
+        assertEquals(Set.of("assign", "list"), group.nodes().get("role").nodes().keySet());
     }
 
     @Test
@@ -74,10 +74,10 @@ public class CommandTreeStructureTest {
                 group.nodes().get(action).commandInfo().permission().permission(),
                 "group 动作 " + action + " 应使用独立权限节点");
         }
-        assertEquals("landguard.command.group.role.create",
-            group.nodes().get("role").nodes().get("create").commandInfo().permission().permission());
         assertEquals("landguard.command.group.role.assign",
             group.nodes().get("role").nodes().get("assign").commandInfo().permission().permission());
+        assertEquals("landguard.command.group.role.list",
+            group.nodes().get("role").nodes().get("list").commandInfo().permission().permission());
 
         AdminCommand admin = AdminCommand.INSTANCE;
         admin.scanNodes();

@@ -26,6 +26,9 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("com.crypticlib:bukkit:${rootProject.findProperty("crypticlibVer")}")
     testImplementation("net.kyori:adventure-api:${rootProject.findProperty("adventureApiVer")}")
+    // 注意：MockBukkit 4.44 未实现 ItemMeta#setItemModel，而 crypticlib 构造图标时无条件调用它，
+    // 导致 ui/ClaimMenuMockTest 全部被 MockBukkit 中止（Gradle 显示为 SKIPPED）。修复需升级到
+    // 针对 paper-api 1.21.11 构建的 MockBukkit，那会同时改动插件的编译目标，故暂不处理。
     testImplementation("org.mockbukkit.mockbukkit:mockbukkit-v1.21:4.44.0")
     testImplementation("org.mockito:mockito-core:5.14.2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.12.1")

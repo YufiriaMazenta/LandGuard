@@ -96,7 +96,7 @@ public class ProtectionChainTest {
         return new DataSnapshot(
             byId, byChunk, chunksByClaim, byOwner, flagsByClaim,
             new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(),
-            new LinkedHashMap<>(), new LinkedHashMap<>()
+            new LinkedHashMap<>()
         );
     }
 
@@ -128,15 +128,16 @@ public class ProtectionChainTest {
 
     @Test
     void overrideIsPerClaimAndPerRoleAndNeverRebindsIdentity() {
-        // c1：R1 开门允许；c2：无任何覆盖。R1/R2 是不同身份但默认 flag 组合相同
+        // c1：R1 开容器允许；c2：无任何覆盖。R1/R2 是未在配置中定义的身份，按「成员」身份生效，
+        // 而成员的容器默认拒绝 —— 因此容器能区分出「覆盖生效」与「回落到默认」。
         Map<String, Map<String, Map<String, Boolean>>> flags = new LinkedHashMap<>();
-        flags.put("c1", Map.of("R1", Map.of(BuiltinFlags.DOOR.id(), true)));
+        flags.put("c1", Map.of("R1", Map.of(BuiltinFlags.CONTAINER.id(), true)));
         DataSnapshot snapshot = guildSnapshot(flags);
 
-        var r1InC1 = ProtectionChecker.checkBehavior(snapshot, CAROL, WORLD, 0, 0, BuiltinFlags.DOOR);
-        var r1InC2 = ProtectionChecker.checkBehavior(snapshot, CAROL, WORLD, 1, 0, BuiltinFlags.DOOR);
-        var r2InC1 = ProtectionChecker.checkBehavior(snapshot, DAVE, WORLD, 0, 0, BuiltinFlags.DOOR);
-        var r2InC2 = ProtectionChecker.checkBehavior(snapshot, DAVE, WORLD, 1, 0, BuiltinFlags.DOOR);
+        var r1InC1 = ProtectionChecker.checkBehavior(snapshot, CAROL, WORLD, 0, 0, BuiltinFlags.CONTAINER);
+        var r1InC2 = ProtectionChecker.checkBehavior(snapshot, CAROL, WORLD, 1, 0, BuiltinFlags.CONTAINER);
+        var r2InC1 = ProtectionChecker.checkBehavior(snapshot, DAVE, WORLD, 0, 0, BuiltinFlags.CONTAINER);
+        var r2InC2 = ProtectionChecker.checkBehavior(snapshot, DAVE, WORLD, 1, 0, BuiltinFlags.CONTAINER);
         assertTrue(r1InC1.allowed(), "c1 的 R1 覆盖生效");
         assertFalse(r1InC2.allowed(), "同角色在 c2 不受 c1 覆盖影响");
         assertFalse(r2InC1.allowed(), "同领地另一角色 R2 不受 R1 覆盖影响");
@@ -148,10 +149,10 @@ public class ProtectionChainTest {
 
         // 把 c1 的 R1 覆盖改为 false，R2 仍然不受影响
         Map<String, Map<String, Map<String, Boolean>>> changed = new LinkedHashMap<>();
-        changed.put("c1", Map.of("R1", Map.of(BuiltinFlags.DOOR.id(), false)));
+        changed.put("c1", Map.of("R1", Map.of(BuiltinFlags.CONTAINER.id(), false)));
         DataSnapshot afterToggle = guildSnapshot(changed);
-        assertFalse(ProtectionChecker.checkBehavior(afterToggle, CAROL, WORLD, 0, 0, BuiltinFlags.DOOR).allowed());
-        assertFalse(ProtectionChecker.checkBehavior(afterToggle, DAVE, WORLD, 0, 0, BuiltinFlags.DOOR).allowed());
+        assertFalse(ProtectionChecker.checkBehavior(afterToggle, CAROL, WORLD, 0, 0, BuiltinFlags.CONTAINER).allowed());
+        assertFalse(ProtectionChecker.checkBehavior(afterToggle, DAVE, WORLD, 0, 0, BuiltinFlags.CONTAINER).allowed());
     }
 
     @Test

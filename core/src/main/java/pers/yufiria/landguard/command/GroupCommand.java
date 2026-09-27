@@ -16,10 +16,10 @@ import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
 import pers.yufiria.landguard.group.GroupOpResult;
 import pers.yufiria.landguard.group.GroupService;
-import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.identity.Identity;
+import pers.yufiria.landguard.identity.IdentityRegistry;
 import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 
 /**
- * {@code /land group ...}：用户组建/解散、邀请体系、成员管理、自定义角色、个人领地转让给组。
+ * {@code /land group ...}：用户组建/解散、邀请体系、成员管理、身份指派、个人领地转让给组。
  * 子命令交由框架节点树分派（{@code @Subcommand}）：每个动作独立权限节点、独立补全，
  * 参数列表已去掉动作名（{@code args.get(0)} 即该动作的第一个参数）。
  * 所有写操作走 {@link GroupService}（单写线程原子落库），命令层只做参数解析与反馈。
@@ -107,7 +107,7 @@ public final class GroupCommand extends CommandNode {
         return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.memberGroups(player.uniqueId());
     }
 
-    /** 第一参数为该玩家拥有的用户组名（组内角色为 owner）。 */
+    /** 第一参数为该玩家可解散 / 转让领袖的用户组名（组内身份拥有 disband 权限点）。 */
     private static PlayerOnlyCommand.TabCompleter ownedGroups() {
         return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.ownedGroups(player.uniqueId());
     }
@@ -117,7 +117,7 @@ public final class GroupCommand extends CommandNode {
         return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.invitedGroups(player.uniqueId());
     }
 
-    /** 第一参数为该玩家可管理的用户组名（组内角色为 owner 或 manager）。 */
+    /** 第一参数为该玩家可管理的用户组名（组内身份拥有 invite 权限点）。 */
     private static PlayerOnlyCommand.TabCompleter managedGroups() {
         return (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.managedGroups(player.uniqueId());
     }
@@ -140,25 +140,27 @@ public final class GroupCommand extends CommandNode {
         };
     }
 
-    /** 第一参数为可管理的用户组名，第二参数为在线玩家名，第三参数为该组的角色标识。 */
+    /** 第一参数为可管理的用户组名，第二参数为在线玩家名，第三参数为该组可用的身份标识（identities.yml 的 id）。 */
     private static PlayerOnlyCommand.TabCompleter managedGroupsThenPlayerThenRole() {
         return (player, args) -> switch (args.size()) {
             case 1 -> CommandCompletions.managedGroups(player.uniqueId());
             case 2 -> CommandCompletions.onlinePlayers();
-            case 3 -> CommandCompletions.groupRoles(args.get(0));
+            case 3 -> CommandCompletions.identityIds();
             default -> List.of();
         };
     }
 
-    /** {@code /land group role create|assign ...}：二级节点，本身只负责缺参提示。 */
+    /** {@code /land group role assign|list ...}：二级节点，本身只负责缺参提示。 */
     static final class RoleNode extends CommandNode {
 
         @Subcommand
-        CommandNode create = new PlayerOnlyCommand(PERM_PREFIX + "role.create", "create",
-            (player, args) -> INSTANCE.createRole(player, args), managedGroups());
-        @Subcommand
         CommandNode assign = new PlayerOnlyCommand(PERM_PREFIX + "role.assign", "assign",
             (player, args) -> INSTANCE.assignRole(player, args), managedGroupsThenPlayerThenRole());
+
+        @Subcommand
+        CommandNode list = new PlayerOnlyCommand(PERM_PREFIX + "role.list", "list",
+            (player, args) -> INSTANCE.listIdentities(player, args),
+            (player, args) -> args.size() > 1 ? List.of() : CommandCompletions.allGroups());
 
         RoleNode() {
             super(CommandInfo.builder("role").permission(new PermInfo(PERM_PREFIX + "role")).build());
@@ -262,26 +264,6 @@ public final class GroupCommand extends CommandNode {
             Languages.COMMAND_GROUP_TRANSFER_SUCCESS, Map.of("<group>", args.get(0), "<player>", args.get(1)));
     }
 
-    /** {@code /land group role create <组> <roleId> <priority> [显示名...]} */
-    private void createRole(CommonPlayer player, List<String> args) {
-        if (args.size() < 3) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_USAGE);
-            return;
-        }
-        int priority;
-        try {
-            priority = Integer.parseInt(args.get(2));
-        } catch (NumberFormatException e) {
-            LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_ROLE_ID_INVALID);
-            return;
-        }
-        String groupName = args.get(0);
-        String roleId = args.get(1);
-        String displayName = String.join(" ", args.subList(3, args.size()));
-        run(player, GroupService.INSTANCE.createRole(player.uniqueId(), groupName, roleId, priority, displayName),
-            Languages.COMMAND_GROUP_ROLE_CREATED, Map.of("<group>", groupName, "<role>", roleId));
-    }
-
     /** {@code /land group role assign <组> <玩家> <roleId>} */
     private void assignRole(CommonPlayer player, List<String> args) {
         if (args.size() < 3) {
@@ -323,6 +305,41 @@ public final class GroupCommand extends CommandNode {
         }
     }
 
+    /** {@code /land group role list [组标识符]}：列出全服身份；给定已存在的组时附带各身份的成员数。 */
+    private void listIdentities(CommonPlayer player, List<String> args) {
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        List<Identity> identities = IdentityRegistry.INSTANCE.all();
+        if (!args.isEmpty()) {
+            GroupData group = GroupService.findById(snapshot, args.getFirst());
+            if (group == null) {
+                LangUtils.sendLang(player, Languages.COMMAND_GROUP_FAIL_NOT_FOUND);
+                return;
+            }
+            Map<UUID, String> members = snapshot.groupMembers().getOrDefault(group.getGroupId(), Map.of());
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_ROLE_LIST_HEADER,
+                Map.of("<size>", String.valueOf(identities.size())));
+            for (Identity identity : identities) {
+                long count = members.values().stream().filter(identity.id()::equals).count();
+                LangUtils.sendLang(player, Languages.COMMAND_GROUP_ROLE_LIST_GROUP_ENTRY, Map.of(
+                    "<id>", identity.id(),
+                    "<name>", identity.name(),
+                    "<priority>", String.valueOf(identity.priority()),
+                    "<members>", String.valueOf(count)));
+            }
+            return;
+        }
+        LangUtils.sendLang(player, Languages.COMMAND_GROUP_ROLE_LIST_HEADER,
+            Map.of("<size>", String.valueOf(identities.size())));
+        for (Identity identity : identities) {
+            LangUtils.sendLang(player, Languages.COMMAND_GROUP_ROLE_LIST_ENTRY, Map.of(
+                "<id>", identity.id(),
+                "<name>", identity.name(),
+                "<priority>", String.valueOf(identity.priority()),
+                "<permissions>", String.valueOf(identity.permissions().size()),
+                "<behaviors>", String.valueOf(identity.behaviors().size())));
+        }
+    }
+
     private void info(CommonPlayer player, List<String> args) {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
         GroupData group;
@@ -342,7 +359,6 @@ public final class GroupCommand extends CommandNode {
             return;
         }
         Map<UUID, String> members = snapshot.groupMembers().getOrDefault(group.getGroupId(), Map.of());
-        Map<String, GroupRoleData> roles = snapshot.groupRoles().getOrDefault(group.getGroupId(), Map.of());
         StringBuilder memberNames = new StringBuilder();
         for (UUID member : members.keySet()) {
             if (!memberNames.isEmpty()) {
@@ -351,9 +367,11 @@ public final class GroupCommand extends CommandNode {
             memberNames.append(nameOf(member));
         }
         StringBuilder roleNames = new StringBuilder();
-        roleNames.append(Roles.OWNER).append(", ").append(Roles.MANAGER).append(", ").append(Roles.MEMBER);
-        for (GroupRoleData role : roles.values()) {
-            roleNames.append(", ").append(role.getName());
+        for (Identity identity : IdentityRegistry.INSTANCE.all()) {
+            if (!roleNames.isEmpty()) {
+                roleNames.append(", ");
+            }
+            roleNames.append(identity.id()).append("(").append(identity.name()).append(")");
         }
         LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_HEADER);
         LangUtils.sendLang(player, Languages.COMMAND_GROUP_INFO_NAME, Map.of(
@@ -407,12 +425,12 @@ public final class GroupCommand extends CommandNode {
                 case NO_INVITE -> Languages.COMMAND_GROUP_FAIL_NO_INVITE;
                 case LEADER_CANNOT_LEAVE -> Languages.COMMAND_GROUP_FAIL_LEADER_CANNOT_LEAVE;
                 case CANNOT_KICK -> Languages.COMMAND_GROUP_FAIL_CANNOT_KICK;
-                case ROLE_EXISTS -> Languages.COMMAND_GROUP_FAIL_ROLE_EXISTS;
-                case ROLE_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_ROLE_NOT_FOUND;
-                case ROLE_ID_INVALID -> Languages.COMMAND_GROUP_FAIL_ROLE_ID_INVALID;
-                case ROLE_BUILTIN -> Languages.COMMAND_GROUP_FAIL_ROLE_BUILTIN;
+                case CANNOT_ASSIGN -> Languages.COMMAND_GROUP_FAIL_CANNOT_ASSIGN;
+                case IDENTITY_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_IDENTITY_NOT_FOUND;
                 case CLAIM_NOT_FOUND -> Languages.COMMAND_GROUP_FAIL_CLAIM_NOT_FOUND;
                 case NOT_CLAIM_OWNER -> Languages.COMMAND_GROUP_FAIL_NOT_CLAIM_OWNER;
+                case GROUP_HAS_CLAIM -> Languages.COMMAND_GROUP_FAIL_GROUP_HAS_CLAIM;
+                case GROUP_QUOTA_EXCEEDED -> Languages.COMMAND_GROUP_FAIL_GROUP_QUOTA_EXCEEDED;
             };
         }
         LangUtils.sendLang(player, entry);

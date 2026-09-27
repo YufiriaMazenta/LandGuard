@@ -39,7 +39,6 @@ public enum LandDaoManager implements LifecycleTask {
     private Dao<PlayerQuotaData> playerQuotaDao;
     private Dao<GroupData> groupDao;
     private Dao<GroupMemberData> groupMemberDao;
-    private Dao<GroupRoleData> groupRoleDao;
 
     @Override
     public void onLifecycle(CrypticLibPlugin crypticLibPlugin, LifecyclePhase lifecyclePhase) {
@@ -56,7 +55,6 @@ public enum LandDaoManager implements LifecycleTask {
             playerQuotaDao = create(connectionSource, PlayerQuotaData.class);
             groupDao = create(connectionSource, GroupData.class);
             groupMemberDao = create(connectionSource, GroupMemberData.class);
-            groupRoleDao = create(connectionSource, GroupRoleData.class);
             SchemaMigrations.migrate(connectionSource);
         } catch (SQLException e) {
             CrypticLib.info("&cFailed to initialize LandGuard tables: " + e.getMessage());
@@ -100,10 +98,6 @@ public enum LandDaoManager implements LifecycleTask {
 
     public Dao<GroupMemberData> groupMemberDao() {
         return groupMemberDao;
-    }
-
-    public Dao<GroupRoleData> groupRoleDao() {
-        return groupRoleDao;
     }
 
 }

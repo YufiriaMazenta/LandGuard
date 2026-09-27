@@ -255,8 +255,6 @@ public enum DataStore implements LifecycleTask {
                 full || parts.contains(SnapshotPart.GROUP) ? loadGroups(daos) : base.groups();
             Map<String, Map<UUID, String>> groupMembers =
                 full || parts.contains(SnapshotPart.GROUP_MEMBER) ? loadGroupMembers(daos) : base.groupMembers();
-            Map<String, Map<String, GroupRoleData>> groupRoles =
-                full || parts.contains(SnapshotPart.GROUP_ROLE) ? loadGroupRoles(daos) : base.groupRoles();
 
             return new DataSnapshot(
                 claimsById,
@@ -267,8 +265,7 @@ public enum DataStore implements LifecycleTask {
                 settingsByClaim,
                 players,
                 groups,
-                groupMembers,
-                groupRoles
+                groupMembers
             );
         }
 
@@ -394,16 +391,6 @@ public enum DataStore implements LifecycleTask {
                     .put(row.getMemberUuid(), row.getRoleId());
             }
             return groupMembers;
-        }
-
-        private static Map<String, Map<String, GroupRoleData>> loadGroupRoles(LandDaoManager daos) throws SQLException {
-            Map<String, Map<String, GroupRoleData>> groupRoles = new LinkedHashMap<>();
-            for (GroupRoleData row : daos.groupRoleDao().queryForAll()) {
-                groupRoles
-                    .computeIfAbsent(row.getGroupId(), k -> new LinkedHashMap<>())
-                    .put(row.getRoleId(), row);
-            }
-            return groupRoles;
         }
 
         private static Map<OwnerRef, Set<String>> deriveClaimsByOwner(Map<String, ClaimData> claimsById) {

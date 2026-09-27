@@ -35,9 +35,10 @@ public final class UnclaimCommand extends CommandNode {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
 
         if (!args.isEmpty() && args.get(0).equalsIgnoreCase("auto")) {
-            AutoModeManager.Mode mode = AutoModeManager.INSTANCE.toggle(
+            // 放弃模式不涉及身份，用兼容重载（等价于以本人身份）
+            AutoModeManager.AutoState state = AutoModeManager.INSTANCE.toggle(
                 player.uniqueId(), AutoModeManager.Mode.UNCLAIM);
-            LangUtils.sendLang(player, mode == AutoModeManager.Mode.UNCLAIM
+            LangUtils.sendLang(player, state.mode() == AutoModeManager.Mode.UNCLAIM
                 ? Languages.COMMAND_UNCLAIM_AUTO_ON
                 : Languages.COMMAND_UNCLAIM_AUTO_OFF);
             return;

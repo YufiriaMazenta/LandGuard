@@ -11,16 +11,21 @@ import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.ClaimData;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.PermissionPoint;
+import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.util.LangUtils;
 
 import java.util.*;
 import java.util.function.Supplier;
 
 /**
- * 成员只读列表：展示当前所有者实体的全部成员及其角色标识。
- * 成员变更归属所有者体系（个人无成员；用户组走 /land group），本页不提供编辑操作。
+ * 成员列表：展示当前所有者实体的全部成员及其身份标识。
+ * 个人领地只读；用户组领地可由拥有 {@link PermissionPoint#GROUP_ASSIGN} 的查看者左键点击成员，
+ * 打开 {@link MemberIdentityMenu} 指派身份（身份来自 identities.yml，无权限则提示）。
  */
 public class MembersMenu extends Menu {
 
@@ -102,6 +107,10 @@ public class MembersMenu extends Menu {
         ClaimOwner owner = claim == null ? null : ClaimOwnerRegistry.INSTANCE.resolve(
             OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()));
         Player player = player().orElse(null);
+        boolean groupClaim = claim != null && BuiltinOwnerTypes.GROUP.equals(claim.getOwnerType());
+        UUID viewerUuid = player == null ? null : player.getUniqueId();
+        boolean canAssign = groupClaim && viewerUuid != null
+            && IdentityPermissions.canActOnClaim(snapshot, claim, viewerUuid, PermissionPoint.GROUP_ASSIGN);
         for (int slot = 0; slot < PAGE_SIZE; slot++) {
             int index = start + slot;
             if (index >= members.size()) {
@@ -113,10 +122,22 @@ public class MembersMenu extends Menu {
             if (role == null) {
                 role = "?";
             }
-            List<String> lore = List.of(MenuSupport.text(player, Languages.MENU_MEMBERS_ENTRY_ROLE,
-                Map.of("<role>", role)));
-            setIcon(slot, MenuSupport.icon(Material.PLAYER_HEAD,
-                MenuSupport.displayName(memberId), lore));
+            List<String> lore = new ArrayList<>();
+            lore.add(MenuSupport.text(player, Languages.MENU_MEMBERS_ENTRY_ROLE, Map.of("<role>", role)));
+            if (groupClaim) {
+                lore.add(MenuSupport.text(player, Languages.MENU_MEMBERS_ENTRY_ACTION));
+            }
+            Icon icon = MenuSupport.icon(Material.PLAYER_HEAD, MenuSupport.displayName(memberId), lore);
+            if (groupClaim) {
+                icon.setClickAction(event -> {
+                    if (canAssign) {
+                        new MemberIdentityMenu(player, claimId, memberId, page).openMenu();
+                    } else {
+                        LangUtils.sendLang(player, Languages.MENU_MEMBERS_NO_PERMISSION);
+                    }
+                });
+            }
+            setIcon(slot, icon);
         }
         if (members.isEmpty()) {
             setIcon(22, MenuSupport.icon(Material.BARRIER,

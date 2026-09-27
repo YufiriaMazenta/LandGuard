@@ -4,14 +4,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
-import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
 import pers.yufiria.landguard.group.GroupService;
-import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.IdentityRegistry;
+import pers.yufiria.landguard.identity.PermissionPoint;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -43,32 +42,36 @@ final class CommandCompletions {
     }
 
     /**
-     * 该玩家可管理的用户组标识符：组内角色为 owner 或 manager。
-     * 传入 null 表示不限定角色（即全部已加入的组）。
+     * 该玩家有指定权限点的用户组标识符（null 表示不限权限，即全部已加入的组）。
+     * 判定统一走 {@link IdentityPermissions}，因此领袖即使没有成员行也能补全出来。
      */
-    private static List<String> groupsWhere(UUID player, List<String> allowedRoles) {
+    private static List<String> groupsWhere(UUID player, PermissionPoint point) {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
         List<String> ids = new ArrayList<>();
-        snapshot.groupMembers().forEach((groupId, members) -> {
-            String role = members.get(player);
-            if (role == null || (allowedRoles != null && !allowedRoles.contains(role))) {
-                return;
+        for (String groupId : snapshot.groups().keySet()) {
+            if (!IdentityPermissions.isMember(snapshot, groupId, player)) {
+                continue;
             }
-            if (snapshot.groups().containsKey(groupId)) {
+            if (point == null || IdentityPermissions.has(snapshot, groupId, player, point)) {
                 ids.add(groupId);
             }
-        });
+        }
         return ids;
     }
 
-    /** 该玩家在组内角色为 owner 或 manager 的用户组标识符。 */
+    /** 该玩家可邀请/踢人/指派身份的用户组标识符。 */
     static List<String> managedGroups(UUID player) {
-        return groupsWhere(player, List.of(Roles.OWNER, Roles.MANAGER));
+        return groupsWhere(player, PermissionPoint.GROUP_INVITE);
     }
 
-    /** 该玩家在组内角色为 owner 的用户组标识符。 */
+    /** 该玩家可解散的用户组标识符。 */
     static List<String> ownedGroups(UUID player) {
-        return groupsWhere(player, List.of(Roles.OWNER));
+        return groupsWhere(player, PermissionPoint.GROUP_DISBAND);
+    }
+
+    /** 该玩家可放弃/扩张组领地的用户组标识符。 */
+    static List<String> expandableGroups(UUID player) {
+        return groupsWhere(player, PermissionPoint.CLAIM_EXPAND);
     }
 
     /** 该玩家当前有待处理邀请的用户组标识符。 */
@@ -76,18 +79,9 @@ final class CommandCompletions {
         return new ArrayList<>(GroupService.INSTANCE.pendingInviteGroupIds(player));
     }
 
-    /** 指定用户组的可选角色标识：内置角色 + 该组自定义角色。 */
-    static List<String> groupRoles(String groupId) {
-        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        GroupData group = GroupService.findById(snapshot, groupId);
-        if (group == null) {
-            return List.of();
-        }
-        List<String> roles = new ArrayList<>(List.of(Roles.OWNER, Roles.MANAGER, Roles.MEMBER));
-        for (GroupRoleData role : snapshot.groupRoles().getOrDefault(group.getGroupId(), Map.of()).values()) {
-            roles.add(role.getRoleId());
-        }
-        return roles;
+    /** 全部可用身份标识（全服统一，与具体用户组无关）。 */
+    static List<String> identityIds() {
+        return new ArrayList<>(IdentityRegistry.INSTANCE.ids());
     }
 
 }

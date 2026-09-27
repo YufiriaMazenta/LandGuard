@@ -70,7 +70,7 @@ public class ProtectionHotPathBenchmarkTest {
         return new DataSnapshot(
             byId, byChunk, chunksByClaim, byOwner, new LinkedHashMap<>(),
             new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(),
-            new LinkedHashMap<>(), new LinkedHashMap<>()
+            new LinkedHashMap<>()
         );
     }
 

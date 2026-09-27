@@ -2,7 +2,6 @@ package pers.yufiria.landguard.data;
 
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
 import pers.yufiria.landguard.database.entity.PlayerData;
 
 import java.sql.SQLException;
@@ -33,7 +32,6 @@ public final class SnapshotAudit {
         compare("players", playerFields(published.players()), playerFields(expected.players()));
         compare("groups", groupFields(published.groups()), groupFields(expected.groups()));
         compare("groupMembers", published.groupMembers(), expected.groupMembers());
-        compare("groupRoles", groupRoleFields(published.groupRoles()), groupRoleFields(expected.groupRoles()));
     }
 
     private static <K, V> void compare(String component, Map<K, V> actual, Map<K, V> expected) {
@@ -78,19 +76,6 @@ public final class SnapshotAudit {
         Map<String, List<Object>> result = new LinkedHashMap<>();
         source.forEach((groupId, group) -> result.put(groupId, Arrays.asList(
             group.getName(), group.getLeaderUuid(), group.getCreatedAt(), group.getBankBalance())));
-        return result;
-    }
-
-    private static Map<String, Map<String, List<Object>>> groupRoleFields(
-        Map<String, Map<String, GroupRoleData>> source
-    ) {
-        Map<String, Map<String, List<Object>>> result = new LinkedHashMap<>();
-        source.forEach((groupId, roles) -> {
-            Map<String, List<Object>> roleMap = new LinkedHashMap<>();
-            roles.forEach((roleId, role) -> roleMap.put(roleId, Arrays.asList(
-                role.getPriority(), role.getName())));
-            result.put(groupId, roleMap);
-        });
         return result;
     }
 

@@ -8,10 +8,10 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
 
 ## Features
 
-- **Pure chunk claims**: claim, unclaim (your own claims and groups you lead), radius batch (skips chunks that are already claimed), walk-to-auto-claim / auto-unclaim, particle boundary visualization
+- **Pure chunk claims**: claim, unclaim (your own claims, plus group claims your in-group identity may unclaim), radius batch (skips chunks that are already claimed), walk-to-auto-claim / auto-unclaim, particle boundary visualization
 - **Entry notices**: configurable action bar or chat message when you step into a claim, plus particle boundary rendering (with both a server-level and a per-player toggle)
-- **Organization-first**: built-in groups (invites / roles / transfer / claim gifting) plus an open ownership SPI for third-party organization systems
-- **Role × flag model**: owner / manager / member / visitor and custom roles, each with independently configurable behavioral and natural protection flags
+- **Organization-first**: built-in groups (invites / identities / transfer / claim gifting) plus an open ownership SPI for third-party organization systems
+- **Identity × flag model**: identities such as owner / manager / member / visitor are all defined in `identities.yml` (server-wide, groups cannot define their own), and each identity independently configures group-management permissions and in-claim behavior flags
 - **Comprehensive protection vectors**: place / break / container / door / redstone / crafting / vehicle / animal / interaction entity / planting / harvest / item / bank; PvP / explosion / fire spread / fluid flow / piston / mob spawn / mob grief / trample. Cross-boundary pistons and fluids are decided by the target chunk
 - **GUI management**: `/land` opens the claim list, detail view, tri-state flag cycling, members and claim bank menus
 - **Economy**: optional Vault hook for quota trading, claim banks, periodic upkeep and debt grace periods
@@ -32,20 +32,47 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
    - `database.yml`: sqlite / mysql
    - `economy.yml`: economy toggle and quota prices
    - `upkeep.yml`: upkeep fee and debt/inactivity/orphan grace periods
+   - `identities.yml`: group identities and permissions (group-management permission points + in-claim behavior flags)
+
+## Identities & permissions
+
+A group **identity** (role) and its two kinds of permissions are entirely defined in `identities.yml`, **server-wide**: groups may only use the identities defined in the config, and players cannot define their own.
+
+Each identity configures two kinds of permissions:
+
+- `permissions`: group-management permission points (e.g. `group.invite`, `group.assign_identity`, `claim.expand`, `claim.flags`) that decide whether the identity can invite / kick / assign identities / claim and expand group claims, etc.;
+- `behaviors`: in-claim behavior flags (e.g. `place`, `container`, `bank`) that decide what the identity may do inside a claim; `behaviors: ['*']` means all behaviors.
+
+Two semantic anchors (at most one each):
+
+- `leader: true`: the leader identity — the highest in the group, obtainable only via "transfer leadership"; cannot be assigned, cannot be kicked;
+- `default: true`: the non-member default identity — players who are not in the group are judged by it.
+
+When the config is missing (file absent / section empty / every entry invalid), the plugin falls back to the built-in seed identities `owner` / `manager` / `member` / `visitor`, matching the old behavior item by item.
+
+> ⚠️ An identity `id` is a stable identifier (stored on member rows and used as the key of claim flag override rows). **Changing an id invalidates existing claim flag override rows**, so prefer changing only `name` / `priority` / permissions and keep the id stable.
+
+### How old data falls back after an identity is deleted
+
+When a member row's `role_id` points to an identity no longer present in the config, that member takes effect as the "member" (`member`) identity, and **nothing is written back to the database**: the config can be reverted at any time, the read-time fallback is reversible and idempotent, and the member row itself is an audit trail. Likewise, claim flag override rows pointing to a deleted identity stop taking effect, but are neither leaked nor misapplied.
+
+The `lg_group_role` table used by the old custom-role feature is no longer used. It is **not dropped automatically** (so you can roll back to an older version); run `DROP TABLE lg_group_role` manually to clean it up.
 
 ## Commands
 
 | Command | Description |
 |---|---|
 | `/land` | Open the claims GUI |
-| `/land claim [radius <r> \| auto]` | Claim the standing chunk / square batch / toggle walk auto-claim (batches skip chunks that are already claimed) |
-| `/land unclaim [auto]` | Unclaim the standing chunk / toggle walk auto-unclaim (your own claims and groups you lead; other members cannot unclaim group claims) |
+| `/land claim [radius <r> \| auto] [--group <group id>]` | Claim the standing chunk / square batch / toggle walk auto-claim (batches skip chunks that are already claimed); by default as yourself, `--group` claims / expands group claims as that group |
+| `/land unclaim [auto]` | Unclaim the standing chunk / toggle walk auto-unclaim (your own claims, plus group claims your in-group identity may unclaim; that permission is held by the leader and managers by default) |
 | `/land list` | List your claims |
 | `/land info` | Information about the claim you stand on |
 | `/land boundary` | Toggle particle boundary rendering on claim entry (per player, on by default) |
 | `/land rename <new name>` | Rename the claim you stand on (owner only; spaces allowed, up to 32 characters) |
 | `/land transfer --player <player>` / `--group <group id>` | Transfer the claim you stand on to another player or group (owner only) |
 | `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|rename\|role\|list\|info` | Group management (`transfer` transfers group leadership, `rename` changes the display name) |
+| `/land group role assign <group id> <player> <identity>` | Assign a member identity (identities come from `identities.yml`) |
+| `/land group role list [group id]` | List all identities (id / display name / priority / permission count / behavior count); with a group id, also the member count per identity |
 | `/land buy <amount>` / `/land sell <amount>` | Buy/sell chunk quota (economy required) |
 | `/land bank [deposit\|withdraw <amount>]` | Claim bank (economy required) |
 | `/land admin claim\|unclaim\|transfer\|release\|exempt\|rename\|info\|orphans\|run` | Administration |
@@ -65,7 +92,7 @@ Each subcommand is granted independently (ungranted subcommands are hidden from 
 | `landguard.command.buy` / `sell` / `bank` | OP | Buy blocks / sell blocks / claim bank (requires Vault) |
 | `landguard.command.group` | OP | Root of the `/land group` subtree (prints usage with no args) |
 | `landguard.command.group.<action>` | OP | `create`, `disband`, `invite`, `accept`, `deny`, `leave`, `kick`, `transfer`, `rename`, `role`, `list`, `info` |
-| `landguard.command.group.role.create` / `.assign` | OP | Create a custom role / assign a role |
+| `landguard.command.group.role.assign` / `.list` | OP | Assign a member identity / list all identities |
 | `landguard.command.admin` | OP | Root of the `/land admin` subtree (prints usage with no args) |
 | `landguard.command.admin.<action>` | OP | `claim`, `unclaim`, `transfer`, `release`, `exempt`, `rename`, `info`, `orphans`, `run` |
 | `landguard.bypass` | **false (including OPs)** | Bypass all behavioral protection checks; must be granted explicitly |

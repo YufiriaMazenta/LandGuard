@@ -18,6 +18,8 @@ import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.PermissionPoint;
 import pers.yufiria.landguard.owner.*;
 import pers.yufiria.landguard.owner.builtin.PlayerClaimOwnerProvider;
 import pers.yufiria.landguard.owner.builtin.group.GroupClaimOwnerProvider;
@@ -34,7 +36,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * TR-7.1 / AC-3 / AC-6（组侧）：邀请加入/踢出即时生效、自定义角色随组持久化、
+ * TR-7.1 / AC-3 / AC-6（组侧）：邀请加入/踢出即时生效、成员身份随组持久化、
  * 领袖转让、领地转让给组、解散触发孤儿流程、组额度公式。
  */
 public class GroupLifecycleIntegrationTest {
@@ -139,23 +141,22 @@ public class GroupLifecycleIntegrationTest {
     }
 
     @Test
-    void customRolePersistsAndLeadershipTransfers() throws Exception {
+    void memberIdentityPersistsAndLeadershipTransfers() throws Exception {
         String groupId = createGuild();
         placeGroupClaim(groupId, 1, 0);
 
-        // 自定义角色随组存储（含优先级），接受邀请后分配
-        GroupOpResult roleCreated = GroupService.INSTANCE.createRole(ALICE, "Guild", "veteran", 10, "老兵").join();
-        assertTrue(roleCreated.success());
+        // 配置身份随组存储：接受邀请后把 CAROL 指派为管理者身份
         assertTrue(GroupService.INSTANCE.invite(ALICE, "Guild", CAROL).join().success());
         assertTrue(GroupService.INSTANCE.acceptInvite(CAROL, "Guild").join().success());
-        assertTrue(GroupService.INSTANCE.assignRole(ALICE, "Guild", CAROL, "veteran").join().success());
+        assertTrue(GroupService.INSTANCE.assignRole(ALICE, "Guild", CAROL, Roles.MANAGER).join().success());
 
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        assertEquals("veteran", snapshot.groupMembers().get(groupId).get(CAROL));
-        assertEquals(10, snapshot.groupRoles().get(groupId).get("veteran").getPriority());
+        assertEquals(Roles.MANAGER, snapshot.groupMembers().get(groupId).get(CAROL));
+        // 身份生效：管理者拥有组管理权限点
+        assertTrue(IdentityPermissions.has(snapshot, groupId, CAROL, PermissionPoint.GROUP_INVITE));
         // 身份不因 flag 变化而改变（AC-6 双字段模型）
         ClaimOwner group = ClaimOwnerRegistry.INSTANCE.resolve(OwnerRef.of(BuiltinOwnerTypes.GROUP, groupId));
-        assertEquals("veteran", group.roleOf(CAROL));
+        assertEquals(Roles.MANAGER, group.roleOf(CAROL));
 
         // 领袖转让：CAROL 成为 owner，ALICE 降为 manager，持久化保持
         GroupOpResult transferred = GroupService.INSTANCE.transferLeadership(ALICE, "Guild", CAROL).join();
@@ -164,11 +165,13 @@ public class GroupLifecycleIntegrationTest {
         assertEquals(CAROL, snapshot.groups().get(groupId).getLeaderUuid());
         assertEquals(Roles.OWNER, snapshot.groupMembers().get(groupId).get(CAROL));
         assertEquals(Roles.MANAGER, snapshot.groupMembers().get(groupId).get(ALICE));
+        assertTrue(IdentityPermissions.isLeader(snapshot, groupId, CAROL));
 
         DataStore.INSTANCE.reloadFrom(connection).join();
         snapshot = DataStore.INSTANCE.snapshot();
         assertEquals(CAROL, snapshot.groups().get(groupId).getLeaderUuid());
-        assertEquals("veteran", snapshot.groupRoles().get(groupId).get("veteran").getRoleId());
+        assertEquals(Roles.OWNER, snapshot.groupMembers().get(groupId).get(CAROL));
+        assertEquals(Roles.MANAGER, snapshot.groupMembers().get(groupId).get(ALICE));
     }
 
     @Test
@@ -223,13 +226,13 @@ public class GroupLifecycleIntegrationTest {
 
         // 仅领袖 1 人：256 + 16 = 272；17x17=289 超额拒绝
         List<ChunkLoc> tooMany = square(quotaWorld, 17);
-        ClaimOpResult over = ClaimService.INSTANCE.claim(groupRef, quotaWorld, tooMany, "G", false).join();
+        ClaimOpResult over = ClaimService.INSTANCE.claim(groupRef, quotaWorld, tooMany, "G", false, ALICE).join();
         assertFalse(over.success());
         assertEquals(ClaimFailureReason.QUOTA_EXCEEDED, over.failureReason());
 
         // 16x16=256 可认领，剩余 16
         List<ChunkLoc> fit = square(quotaWorld, 16);
-        ClaimOpResult ok = ClaimService.INSTANCE.claim(groupRef, quotaWorld, fit, "G", false).join();
+        ClaimOpResult ok = ClaimService.INSTANCE.claim(groupRef, quotaWorld, fit, "G", false, ALICE).join();
         assertTrue(ok.success());
         assertEquals(16, ok.availableChunks());
     }

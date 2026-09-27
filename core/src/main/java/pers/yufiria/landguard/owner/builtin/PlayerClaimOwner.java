@@ -5,10 +5,10 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
+import pers.yufiria.landguard.identity.IdentityRegistry;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.OwnerType;
-import pers.yufiria.landguard.owner.Roles;
 
 import java.util.Objects;
 import java.util.Set;
@@ -43,7 +43,7 @@ public record PlayerClaimOwner(@NotNull UUID uuid) implements ClaimOwner {
 
     @Override
     public String roleOf(UUID player) {
-        return uuid.equals(player) ? Roles.OWNER : null;
+        return uuid.equals(player) ? IdentityRegistry.INSTANCE.leaderIdentityId() : null;
     }
 
     @Override

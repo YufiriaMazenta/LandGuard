@@ -23,9 +23,7 @@ public enum SnapshotPart {
     /** lg_group */
     GROUP,
     /** lg_group_member */
-    GROUP_MEMBER,
-    /** lg_group_role */
-    GROUP_ROLE;
+    GROUP_MEMBER;
 
     public static EnumSet<SnapshotPart> all() {
         return EnumSet.allOf(SnapshotPart.class);

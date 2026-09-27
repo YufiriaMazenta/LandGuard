@@ -11,7 +11,8 @@ import org.jetbrains.annotations.NotNull;
 import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.ClaimData;
-import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.identity.Identity;
+import pers.yufiria.landguard.identity.IdentityRegistry;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -19,18 +20,23 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * flag 设置入口：先选择身份维度（owner/manager/member/visitor 行为矩阵，或自然环境开关）。
+ * flag 设置入口：先选择身份维度（配置里定义的全部身份，本服统一），或自然环境开关。
+ * 身份数量由 identities.yml 决定，因此图标在布局更新时按注册表顺序逐个摆放。
  */
 public class FlagRoleMenu extends Menu {
 
-    // o/m/e 位于 19-21，v/n 位于 23-24，返回 40
+    /** 身份与自然环境入口从 0 号槽位依次摆放，40 号槽位返回。 */
     static final List<String> LAYOUT = List.of(
         "ggggggggg",
         "ggggggggg",
-        "gome.vngg",
+        "ggggggggg",
         "ggggggggg",
         "ggggrgggg"
     );
+
+    /** 领袖身份固定金色头盔，其余身份按顺序循环这三种头盔。 */
+    private static final List<Material> OTHER_MATERIALS = List.of(
+        Material.IRON_HELMET, Material.CHAINMAIL_HELMET, Material.LEATHER_HELMET);
 
     private final String claimId;
     private final int listPage;
@@ -46,19 +52,38 @@ public class FlagRoleMenu extends Menu {
         Player player = player().orElse(null);
         Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
-        icons.put('o', () -> roleIcon(Material.GOLDEN_HELMET,
-            Languages.MENU_ROLE_OWNER_NAME, Languages.MENU_ROLE_OWNER_LORE, Roles.OWNER, false));
-        icons.put('m', () -> roleIcon(Material.IRON_HELMET,
-            Languages.MENU_ROLE_MANAGER_NAME, Languages.MENU_ROLE_MANAGER_LORE, Roles.MANAGER, false));
-        icons.put('e', () -> roleIcon(Material.CHAINMAIL_HELMET,
-            Languages.MENU_ROLE_MEMBER_NAME, Languages.MENU_ROLE_MEMBER_LORE, Roles.MEMBER, false));
-        icons.put('v', () -> roleIcon(Material.LEATHER_HELMET,
-            Languages.MENU_ROLE_VISITOR_NAME, Languages.MENU_ROLE_VISITOR_LORE, Roles.VISITOR, false));
-        icons.put('n', () -> roleIcon(Material.CLOCK,
-            Languages.MENU_ROLE_NATURAL_NAME, Languages.MENU_ROLE_NATURAL_LORE, null, true));
         icons.put('r', () -> MenuSupport.backIcon(player,
             () -> new ClaimDetailMenu(player, claimId, listPage).openMenu()));
         return new MenuDisplay(title(), new MenuLayout(LAYOUT, icons));
+    }
+
+    @Override
+    public void onLayoutUpdated() {
+        Player player = player().orElse(null);
+        int slot = 0;
+        int otherIndex = 0;
+        for (Identity identity : IdentityRegistry.INSTANCE.all()) {
+            Material material = identity.leader()
+                ? Material.GOLDEN_HELMET
+                : OTHER_MATERIALS.get(otherIndex++ % OTHER_MATERIALS.size());
+            setIcon(slot++, identityIcon(player, identity, material));
+        }
+        setIcon(slot, roleIcon(Material.CLOCK,
+            Languages.MENU_ROLE_NATURAL_NAME, Languages.MENU_ROLE_NATURAL_LORE, null, true));
+    }
+
+    private Icon identityIcon(Player player, Identity identity, Material material) {
+        Icon icon = MenuSupport.icon(material, identity.name(),
+            List.of(MenuSupport.text(player, Languages.MENU_ROLE_IDENTITY_LORE, Map.of(
+                "<priority>", String.valueOf(identity.priority()),
+                "<permissions>", String.valueOf(identity.permissions().size())))));
+        icon.setClickAction(event -> {
+            Player clicker = player().orElse(null);
+            if (clicker != null) {
+                new FlagListMenu(clicker, claimId, identity.id(), false, listPage).openMenu();
+            }
+        });
+        return icon;
     }
 
     private Icon roleIcon(Material material, StringLangEntry nameEntry, StringLangEntry loreEntry,

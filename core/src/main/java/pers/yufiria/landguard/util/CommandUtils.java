@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.config.Languages;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -77,6 +78,26 @@ public class CommandUtils {
      */
     public static boolean hasFlag(List<String> args, String flag) {
         return args.stream().anyMatch(a -> a.equalsIgnoreCase(flag));
+    }
+
+    /**
+     * 移除「标志 + 其后一个值」后的位置参数；未出现该标志时原样返回。用于标志可出现在任意位置时先做位置解析。
+     * <p>
+     * 单趟线性扫描：遇到 {@code flag}（忽略大小写）就跳过它与紧随其后的一个 token；
+     * 重复出现时全部移除；末尾裸标志（后面没有值）也跳过该标志本身。不改动入参列表（返回新列表）。
+     */
+    public static @NotNull List<String> withoutValueFlag(@NotNull List<String> args, @NotNull String flag) {
+        List<String> result = new ArrayList<>(args.size());
+        for (int i = 0; i < args.size(); i++) {
+            if (args.get(i).equalsIgnoreCase(flag)) {
+                if (i + 1 < args.size()) {
+                    i++;
+                }
+                continue;
+            }
+            result.add(args.get(i));
+        }
+        return result;
     }
 
 }

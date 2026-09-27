@@ -84,7 +84,7 @@ public class NaturalListenerMockTest {
         return new DataSnapshot(
             new LinkedHashMap<>(), byChunk, new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(),
             new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(),
-            new LinkedHashMap<>(), new LinkedHashMap<>()
+            new LinkedHashMap<>()
         );
     }
 

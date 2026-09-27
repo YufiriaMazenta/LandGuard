@@ -49,6 +49,7 @@ public final class ClaimMessages {
             case QUOTA_EXCEEDED -> Languages.COMMAND_FAIL_QUOTA_EXCEEDED;
             case NOT_CLAIMED -> Languages.COMMAND_FAIL_NOT_CLAIMED;
             case NOT_OWNER -> Languages.COMMAND_FAIL_NOT_OWNER;
+            case NOT_PERMITTED -> Languages.COMMAND_FAIL_NOT_PERMITTED;
             case INVALID_TARGETS -> Languages.COMMAND_FAIL_INVALID_TARGETS;
             case INVALID_NAME -> Languages.COMMAND_FAIL_INVALID_NAME;
             case ALREADY_OWNED -> Languages.COMMAND_FAIL_ALREADY_OWNED;

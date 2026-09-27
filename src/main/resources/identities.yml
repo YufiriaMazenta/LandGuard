@@ -1,0 +1,71 @@
+# 用户组身份定义（全服统一）
+#
+# 组内只能用此处定义的身份，玩家不能自定义身份；每个身份可配置两类权限：
+#   permissions —— 组管理功能（如 invite / claim.expand）
+#   behaviors   —— 领地内行为 flag（如 place / container），支持 '*' 表示全部
+#
+# 语义锚点（各至多一个）：
+#   leader:  true —— 领袖身份：组内最高身份，只能经「转让领袖」获得，不可被指派、不可被踢
+#   default: true —— 非成员默认身份：不在组内的玩家按它判定
+# 都不写时按 id 约定兜底（leader→owner，default→visitor）。
+#
+# 注意：身份 id 是稳定标识（落库在成员表、也是领地 flag 覆盖行的键）。
+# 改动 id 会让已有的领地 flag 覆盖失效，建议只改 name / priority / 权限，保持 id 不变。
+#
+# 未在配置里定义的身份（例如旧库遗留的自定义身份）会按「成员」身份生效，数据不会被改写。
+
+identities:
+  owner:
+    name: '&6领袖'
+    priority: 100
+    leader: true
+    permissions:
+      - group.invite
+      - group.kick
+      - group.rename
+      - group.disband
+      - group.transfer_leadership
+      - group.assign_identity
+      - group.give_claim
+      - claim.expand
+      - claim.unclaim
+      - claim.rename
+      - claim.transfer
+      - claim.flags
+    behaviors: [ '*' ]
+
+  manager:
+    name: '&b管理者'
+    priority: 60
+    permissions:
+      - group.invite
+      - group.kick
+      - group.assign_identity
+      - group.give_claim
+      - claim.expand
+      - claim.unclaim
+      - claim.flags
+    behaviors: [ '*' ]
+
+  member:
+    name: '&a成员'
+    priority: 40
+    behaviors:
+      - place
+      - break
+      - door
+      - redstone
+      - crafting
+      - vehicle
+      - animal
+      - display
+      - planting
+      - harvest
+      - item
+
+  visitor:
+    name: '&7访客'
+    priority: 0
+    default: true
+    behaviors:
+      - crafting

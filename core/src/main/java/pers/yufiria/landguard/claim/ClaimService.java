@@ -11,6 +11,8 @@ import pers.yufiria.landguard.database.entity.ClaimChunkData;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.PlayerData;
 import pers.yufiria.landguard.group.GroupService;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.PermissionPoint;
 import pers.yufiria.landguard.owner.*;
 import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner;
 import pers.yufiria.landguard.util.ConfigValues;
@@ -45,6 +47,17 @@ public enum ClaimService {
      */
     public CompletableFuture<ClaimOpResult> claim(OwnerRef owner, UUID world, List<ChunkLoc> rawTargets,
                                                   String defaultName, boolean admin) {
+        return claim(owner, world, rawTargets, defaultName, admin, null);
+    }
+
+    /**
+     * 带操作者的认领入口：用户组领地需操作者在该组拥有 {@link PermissionPoint#CLAIM_EXPAND}，
+     * 授权在写线程内用同一次 {@code current} 快照复核，GUI/auto 无法绕过。
+     *
+     * @param actor 发起认领的玩家；{@code null} 表示无操作者（组认领将被拒）
+     */
+    public CompletableFuture<ClaimOpResult> claim(OwnerRef owner, UUID world, List<ChunkLoc> rawTargets,
+                                                  String defaultName, boolean admin, @Nullable UUID actor) {
         // 管理领地统一归属虚拟 server 实体：调用方传入的 owner 仅用于普通认领
         OwnerRef effectiveOwner = admin
             ? OwnerRef.of(BuiltinOwnerTypes.SERVER, ServerClaimOwner.ID)
@@ -85,6 +98,12 @@ public enum ClaimService {
             } else if (!admin && owner.typeKey().equals(BuiltinOwnerTypes.GROUP)) {
                 if (!current.groups().containsKey(owner.identifier())) {
                     resultRef.set(ClaimOpResult.failed(ClaimFailureReason.INVALID_TARGETS));
+                    return current;
+                }
+                // 以组身份认领需操作者在该组拥有扩张权限（用同一次 current 快照判定，写库前复核）
+                if (actor == null || !IdentityPermissions.has(current, owner.identifier(), actor,
+                        PermissionPoint.CLAIM_EXPAND)) {
+                    resultRef.set(ClaimOpResult.failed(ClaimFailureReason.NOT_PERMITTED));
                     return current;
                 }
                 capacity = GroupService.INSTANCE.groupCapacity(current, owner.identifier());
@@ -233,8 +252,9 @@ public enum ClaimService {
     }
 
     /**
-     * 玩家自助放弃单个区块：授权按「领地真实所有者 + 操作者在其中的角色」判定
-     * （个人领地＝本人，用户组领地＝组内 {@link Roles#OWNER}），因此组领袖可直接放弃组领地。
+     * 玩家自助放弃单个区块：授权按「领地真实所有者 + 操作者拥有的权限点」判定
+     * （个人领地＝本人，用户组领地＝组内拥有 {@link PermissionPoint#CLAIM_UNCLAIM} 的身份），
+     * 因此组领袖与管理者都可放弃组领地。
      * 授权用已发布快照在进入写线程前判定，写线程内仍由 {@link #unclaim} 复核归属，避免竞态。
      */
     public CompletableFuture<ClaimOpResult> unclaimOwnedBy(UUID actor, ChunkLoc target) {
@@ -244,7 +264,7 @@ public enum ClaimService {
         if (claim == null) {
             return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
         }
-        if (!isOwner(claim, actor)) {
+        if (!IdentityPermissions.canActOnClaim(snapshot, claim, actor, PermissionPoint.CLAIM_UNCLAIM)) {
             return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_OWNER));
         }
         return unclaim(OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()), List.of(target));
@@ -346,28 +366,16 @@ public enum ClaimService {
     }
 
     /**
-     * 判断某玩家是否是这块领地的 owner：个人领地=本人，用户组领地=owner（领袖）角色。
-     * 命令层预检与 GUI 按钮显隐共用本方法。
-     */
-    public static boolean isOwner(ClaimData claim, UUID player) {
-        if (claim == null || player == null) {
-            return false;
-        }
-        ClaimOwner owner = ClaimOwnerRegistry.INSTANCE.resolve(
-            OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()));
-        return owner != null && Roles.OWNER.equals(owner.roleOf(player));
-    }
-
-    /**
-     * 重命名领地：仅该领地的 owner 可操作（授权在进入写线程前用已发布快照判定，
-     * 避免在单写线程内解析用户组角色造成嵌套写入）。
+     * 重命名领地：需操作者在该领地拥有 {@link PermissionPoint#CLAIM_RENAME}
+     * （授权在进入写线程前用已发布快照判定，避免在单写线程内解析用户组角色造成嵌套写入）。
      */
     public CompletableFuture<ClaimOpResult> renameClaim(UUID actor, String claimId, String newName) {
-        ClaimData claim = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        ClaimData claim = snapshot.claimsById().get(claimId);
         if (claim == null) {
             return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
         }
-        if (!isOwner(claim, actor)) {
+        if (!IdentityPermissions.canActOnClaim(snapshot, claim, actor, PermissionPoint.CLAIM_RENAME)) {
             return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_OWNER));
         }
         String name = normalizeClaimName(newName);
@@ -385,13 +393,14 @@ public enum ClaimService {
             LandDaoManager.INSTANCE.claimDao().update(fresh);
             resultRef.set(ClaimOpResult.renamed(claimId));
             return DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
-        }).thenApply(snapshot -> resultRef.get());
+        }).thenApply(next -> resultRef.get());
     }
 
     // ================= 领地转让 =================
 
     /**
-     * 玩家自助把脚下领地转让给另一个玩家：仅该领地的 owner 可操作（个人领地=本人，用户组领地=领袖）。
+     * 玩家自助把脚下领地转让给另一个玩家：需操作者在该领地拥有 {@link PermissionPoint#CLAIM_TRANSFER}
+     * （个人领地=本人，用户组领地=组内拥有该权限的身份）。
      * 状态处理与管理员强制转让一致：admin 标记/豁免/欠费/警告/孤儿状态重置，lastActiveAt 刷新，
      * 领地银行余额随领地保留；双方已用额度按实际持有量校正（允许目标暂时超出容量）。
      * 额外拒绝会破坏「同一所有者在每个世界最多一块领地」约束的目标玩家。
@@ -402,7 +411,7 @@ public enum ClaimService {
         if (claim == null) {
             return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_CLAIMED));
         }
-        if (!isOwner(claim, actor)) {
+        if (!IdentityPermissions.canActOnClaim(snapshot, claim, actor, PermissionPoint.CLAIM_TRANSFER)) {
             return CompletableFuture.completedFuture(ClaimOpResult.failed(ClaimFailureReason.NOT_OWNER));
         }
         if (BuiltinOwnerTypes.PLAYER.equals(claim.getOwnerType())

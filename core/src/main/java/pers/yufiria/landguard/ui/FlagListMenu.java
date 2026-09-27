@@ -13,10 +13,10 @@ import pers.yufiria.landguard.config.Languages;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.ClaimData;
-import pers.yufiria.landguard.owner.ClaimOwner;
-import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
-import pers.yufiria.landguard.owner.OwnerRef;
-import pers.yufiria.landguard.owner.Roles;
+import pers.yufiria.landguard.identity.Identity;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.IdentityRegistry;
+import pers.yufiria.landguard.identity.PermissionPoint;
 import pers.yufiria.landguard.protection.BuiltinFlagDefaults;
 import pers.yufiria.landguard.protection.FlagService;
 import pers.yufiria.landguard.protection.ProtectionChecker;
@@ -114,15 +114,11 @@ public class FlagListMenu extends Menu {
     }
 
     private String roleDisplayName(Player player) {
-        StringLangEntry entry = switch (natural ? "natural" : roleId) {
-            case "natural" -> Languages.MENU_ROLE_NATURAL_NAME;
-            case Roles.OWNER -> Languages.MENU_ROLE_OWNER_NAME;
-            case Roles.MANAGER -> Languages.MENU_ROLE_MANAGER_NAME;
-            case Roles.MEMBER -> Languages.MENU_ROLE_MEMBER_NAME;
-            case Roles.VISITOR -> Languages.MENU_ROLE_VISITOR_NAME;
-            default -> null;
-        };
-        return entry == null ? roleId : MenuSupport.text(player, entry);
+        if (natural) {
+            return MenuSupport.text(player, Languages.MENU_ROLE_NATURAL_NAME);
+        }
+        Identity identity = IdentityRegistry.INSTANCE.get(roleId);
+        return identity == null ? roleId : identity.name();
     }
 
     @Override
@@ -205,16 +201,7 @@ public class FlagListMenu extends Menu {
     private boolean canManage(Player player) {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
         ClaimData claim = snapshot.claimsById().get(claimId);
-        if (claim == null) {
-            return false;
-        }
-        ClaimOwner owner = ClaimOwnerRegistry.INSTANCE.resolve(
-            OwnerRef.of(claim.getOwnerType(), claim.getOwnerId()));
-        if (owner == null) {
-            return false;
-        }
-        String role = owner.roleOf(player.getUniqueId());
-        return Roles.OWNER.equals(role) || Roles.MANAGER.equals(role);
+        return IdentityPermissions.canActOnClaim(snapshot, claim, player.getUniqueId(), PermissionPoint.CLAIM_FLAGS);
     }
 
     @Override

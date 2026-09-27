@@ -43,7 +43,6 @@ public class PersistenceRoundTripTest {
         daos.playerDao().create(new PlayerData(player, 100, 20, 9999L));
         daos.groupDao().create(new GroupData(groupId, "builders", player, 1L, 50.0));
         daos.groupMemberDao().create(new GroupMemberData(groupId, player, "owner"));
-        daos.groupRoleDao().create(new GroupRoleData(groupId, "owner", 100, "Owner"));
         first.close();
 
         // 模拟服务器重启：全新连接 + 清空 Dao 元数据缓存
@@ -74,7 +73,6 @@ public class PersistenceRoundTripTest {
 
         assertEquals("builders", restarted.groupDao().queryForId(groupId).getName());
         assertEquals("owner", restarted.groupMemberDao().queryForAll().get(0).getRoleId());
-        assertEquals(100, restarted.groupRoleDao().queryForAll().get(0).getPriority());
         second.close();
     }
 

@@ -36,7 +36,7 @@ public class MysqlRoundTripTest {
     private static final List<String> EXPECTED_TABLES = List.of(
         "lg_claim", "lg_claim_chunk", "lg_role_flag", "lg_claim_setting",
         "lg_player_data", "lg_player_quota",
-        "lg_group", "lg_group_member", "lg_group_role"
+        "lg_group", "lg_group_member"
     );
 
     private static final UUID WORLD = UUID.randomUUID();
@@ -78,7 +78,7 @@ public class MysqlRoundTripTest {
             for (String expected : EXPECTED_TABLES) {
                 assertTrue(tables.contains(expected), "缺少表 " + expected + "，实际: " + tables);
             }
-            System.out.println("[MYSQL] 9 张表建表成功: " + tables);
+            System.out.println("[MYSQL] 8 张表建表成功: " + tables);
         }
 
         LandDaoManager daos = LandDaoManager.INSTANCE;
@@ -92,7 +92,6 @@ public class MysqlRoundTripTest {
         daos.playerQuotaDao().create(new PlayerQuotaData(PLAYER, 4));
         daos.groupDao().create(new GroupData(GROUP_ID, "builders", PLAYER, 1L, 50.0));
         daos.groupMemberDao().create(new GroupMemberData(GROUP_ID, PLAYER, "owner"));
-        daos.groupRoleDao().create(new GroupRoleData(GROUP_ID, "owner", 100, "Owner"));
         first.close();
 
         // 模拟服务器重启：关闭连接池 + 清空 Dao 元数据缓存 + 全新连接池
@@ -129,10 +128,9 @@ public class MysqlRoundTripTest {
 
         assertEquals("builders", restarted.groupDao().queryForId(GROUP_ID).getName());
         assertEquals("owner", restarted.groupMemberDao().queryForAll().get(0).getRoleId());
-        assertEquals(100, restarted.groupRoleDao().queryForAll().get(0).getPriority());
         second.close();
 
-        System.out.println("[MYSQL] 重启恢复往返通过：claim=1, chunk=2, player/quota/group/member/role 全部一致");
+        System.out.println("[MYSQL] 重启恢复往返通过：claim=1, chunk=2, player/quota/group/member 全部一致");
     }
 
     @Test

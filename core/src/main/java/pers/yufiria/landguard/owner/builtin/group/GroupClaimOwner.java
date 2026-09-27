@@ -6,10 +6,10 @@ import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.GroupData;
+import pers.yufiria.landguard.identity.IdentityPermissions;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.OwnerType;
-import pers.yufiria.landguard.owner.Roles;
 
 import java.util.Collections;
 import java.util.Map;
@@ -64,16 +64,11 @@ public final class GroupClaimOwner implements ClaimOwner {
     @Override
     public @Nullable String roleOf(UUID player) {
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        GroupData group = snapshot.groups().get(groupId);
-        if (group == null) {
+        if (!snapshot.groups().containsKey(groupId)) {
             return null;
         }
-        String role = snapshot.groupMembers().getOrDefault(groupId, Map.of()).get(player);
-        if (role == null && player.equals(group.getLeaderUuid())) {
-            // 领袖身份以 lg_group.leader_uuid 为准，成员行仅作枚举兜底
-            return Roles.OWNER;
-        }
-        return role;
+        // 领袖身份以 lg_group.leader_uuid 为准（优先于成员行），其余照实返回成员行里的身份 id
+        return IdentityPermissions.memberIdentityIdOf(snapshot, groupId, player);
     }
 
 }

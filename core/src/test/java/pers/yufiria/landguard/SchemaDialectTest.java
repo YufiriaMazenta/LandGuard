@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * AC-13 补充：无 MySQL 服务端环境下，验证 8 张表在 MySQL/SQLite 两种方言下
+ * AC-13 补充：无 MySQL 服务端环境下，验证 7 张表在 MySQL/SQLite 两种方言下
  * 均能生成完整合法的建表语句（真实 MySQL 连通测试待部署环境执行）。
  */
 public class SchemaDialectTest {
@@ -24,8 +24,7 @@ public class SchemaDialectTest {
         ClaimSettingData.class,
         PlayerData.class,
         GroupData.class,
-        GroupMemberData.class,
-        GroupRoleData.class
+        GroupMemberData.class
     );
 
     @Test

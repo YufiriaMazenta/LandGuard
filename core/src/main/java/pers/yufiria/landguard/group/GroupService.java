@@ -2,6 +2,8 @@ package pers.yufiria.landguard.group;
 
 import crypticlib.database.dao.Dao;
 import org.jetbrains.annotations.Nullable;
+import pers.yufiria.landguard.claim.ClaimEngine;
+import pers.yufiria.landguard.claim.PlayerQuotaLedger;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
 import pers.yufiria.landguard.data.DataSnapshot;
@@ -11,7 +13,10 @@ import pers.yufiria.landguard.database.dao.LandDaoManager;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
 import pers.yufiria.landguard.database.entity.GroupMemberData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
+import pers.yufiria.landguard.identity.Identity;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.IdentityRegistry;
+import pers.yufiria.landguard.identity.PermissionPoint;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
@@ -36,8 +41,6 @@ public enum GroupService {
 
     INSTANCE;
 
-    private static final Pattern ROLE_ID_PATTERN = Pattern.compile("[a-z0-9_]{1,32}");
-    /** 组标识符（= groupId）格式：与角色标识保持一致。 */
     private static final Pattern GROUP_ID_PATTERN = Pattern.compile("[a-z0-9_]{1,32}");
     private static final int MAX_GROUP_NAME_LENGTH = 32;
 
@@ -67,7 +70,7 @@ public enum GroupService {
             long now = System.currentTimeMillis();
             LandDaoManager daos = LandDaoManager.INSTANCE;
             daos.groupDao().create(new GroupData(wantedId, wantedName, creator, now, 0D));
-            daos.groupMemberDao().create(new GroupMemberData(wantedId, creator, Roles.OWNER));
+            daos.groupMemberDao().create(new GroupMemberData(wantedId, creator, IdentityRegistry.INSTANCE.leaderIdentityId()));
             DataSnapshot next = DataStore.reload(SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER);
             notifyChanged(wantedId);
             resultRef.set(GroupOpResult.ok(wantedId));
@@ -84,7 +87,7 @@ public enum GroupService {
             return failed(GroupFailureReason.INVALID_NAME);
         }
         return withGroup(actor, groupId, resultRef -> (current, group) -> {
-            if (!isLeader(current, group, actor)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_RENAME)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_LEADER));
                 return current;
             }
@@ -104,17 +107,15 @@ public enum GroupService {
 
     public CompletableFuture<GroupOpResult> disband(UUID actor, String groupName) {
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            if (!isLeader(current, group, actor)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_DISBAND)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_LEADER));
                 return current;
             }
             LandDaoManager daos = LandDaoManager.INSTANCE;
-            deleteByGroup(daos.groupRoleDao(), group.getGroupId());
             deleteByGroup(daos.groupMemberDao(), group.getGroupId());
             daos.groupDao().delete(group);
             pendingInvites.remove(group.getGroupId());
-            DataSnapshot next = DataStore.reload(
-                SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER, SnapshotPart.GROUP_ROLE);
+            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER);
             // 名下领地不删除：提供者将无法解析该所有者 → 孤儿流程
             ClaimOwnerRegistry.INSTANCE.notifyOwnerRemoved(
                 OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId()));
@@ -127,8 +128,7 @@ public enum GroupService {
 
     public CompletableFuture<GroupOpResult> invite(UUID actor, String groupName, UUID target) {
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            String actorRole = roleOf(current, group.getGroupId(), actor);
-            if (!Roles.OWNER.equals(actorRole) && !Roles.MANAGER.equals(actorRole)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_INVITE)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_MANAGER));
                 return current;
             }
@@ -192,7 +192,7 @@ public enum GroupService {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_MEMBER));
                 return current;
             }
-            if (Roles.OWNER.equals(role)) {
+            if (IdentityPermissions.isLeader(current, group.getGroupId(), player)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.LEADER_CANNOT_LEAVE));
                 return current;
             }
@@ -206,21 +206,16 @@ public enum GroupService {
 
     public CompletableFuture<GroupOpResult> kick(UUID actor, String groupName, UUID target) {
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            String actorRole = roleOf(current, group.getGroupId(), actor);
-            if (!Roles.OWNER.equals(actorRole) && !Roles.MANAGER.equals(actorRole)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_KICK)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_MANAGER));
                 return current;
             }
-            String targetRole = roleOf(current, group.getGroupId(), target);
-            if (targetRole == null) {
+            if (roleOf(current, group.getGroupId(), target) == null) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.TARGET_NOT_MEMBER));
                 return current;
             }
-            // 领袖不可踢；管理者只能踢普通成员/自定义角色，不能踢管理者
-            boolean allowed = Roles.OWNER.equals(actorRole)
-                ? !Roles.OWNER.equals(targetRole)
-                : !Roles.OWNER.equals(targetRole) && !Roles.MANAGER.equals(targetRole);
-            if (!allowed) {
+            // 层级：只能踢优先级严格低于自己的成员；领袖与自己一律不可踢
+            if (target.equals(actor) || !IdentityPermissions.outranks(current, group.getGroupId(), actor, target)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.CANNOT_KICK));
                 return current;
             }
@@ -234,7 +229,7 @@ public enum GroupService {
 
     public CompletableFuture<GroupOpResult> transferLeadership(UUID actor, String groupName, UUID target) {
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            if (!isLeader(current, group, actor)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_TRANSFER)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_LEADER));
                 return current;
             }
@@ -255,8 +250,8 @@ public enum GroupService {
             }
             storedLeader.setLeaderUuid(target);
             daos.groupDao().update(storedLeader);
-            upsertMemberRole(daos, group.getGroupId(), target, Roles.OWNER);
-            upsertMemberRole(daos, group.getGroupId(), actor, Roles.MANAGER);
+            upsertMemberRole(daos, group.getGroupId(), target, IdentityRegistry.INSTANCE.leaderIdentityId());
+            upsertMemberRole(daos, group.getGroupId(), actor, formerLeaderIdentityId());
             DataSnapshot next = DataStore.reload(SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
@@ -264,46 +259,12 @@ public enum GroupService {
         });
     }
 
-    // ================= 自定义角色 =================
-
-    public CompletableFuture<GroupOpResult> createRole(UUID actor, String groupName,
-                                                       String roleId, int priority, String displayName) {
-        if (roleId == null || !ROLE_ID_PATTERN.matcher(roleId).matches()) {
-            return failed(GroupFailureReason.ROLE_ID_INVALID);
-        }
-        if (Roles.OWNER.equals(roleId) || Roles.MANAGER.equals(roleId)
-            || Roles.MEMBER.equals(roleId) || Roles.VISITOR.equals(roleId)) {
-            return failed(GroupFailureReason.ROLE_BUILTIN);
-        }
-        if (displayName == null || displayName.isBlank()) {
-            return failed(GroupFailureReason.ROLE_ID_INVALID);
-        }
-        return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            String actorRole = roleOf(current, group.getGroupId(), actor);
-            if (!Roles.OWNER.equals(actorRole) && !Roles.MANAGER.equals(actorRole)) {
-                resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_MANAGER));
-                return current;
-            }
-            if (current.groupRoles().getOrDefault(group.getGroupId(), Map.of()).containsKey(roleId)) {
-                resultRef.set(GroupOpResult.failed(GroupFailureReason.ROLE_EXISTS));
-                return current;
-            }
-            LandDaoManager.INSTANCE.groupRoleDao()
-                .create(new GroupRoleData(group.getGroupId(), roleId, priority, displayName.trim()));
-            DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_ROLE);
-            resultRef.set(GroupOpResult.ok(group.getGroupId()));
-            return next;
-        });
-    }
+    // ================= 身份指派 =================
 
     public CompletableFuture<GroupOpResult> assignRole(UUID actor, String groupName,
                                                        UUID target, String roleId) {
-        if (Roles.OWNER.equals(roleId) || Roles.VISITOR.equals(roleId)) {
-            return failed(GroupFailureReason.ROLE_BUILTIN);
-        }
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            String actorRole = roleOf(current, group.getGroupId(), actor);
-            if (!Roles.OWNER.equals(actorRole) && !Roles.MANAGER.equals(actorRole)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_ASSIGN)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_MANAGER));
                 return current;
             }
@@ -311,10 +272,19 @@ public enum GroupService {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.TARGET_NOT_MEMBER));
                 return current;
             }
-            boolean roleKnown = Roles.MANAGER.equals(roleId) || Roles.MEMBER.equals(roleId)
-                || current.groupRoles().getOrDefault(group.getGroupId(), Map.of()).containsKey(roleId);
+            boolean roleKnown = IdentityRegistry.INSTANCE.isRegistered(roleId);
             if (!roleKnown) {
-                resultRef.set(GroupOpResult.failed(GroupFailureReason.ROLE_NOT_FOUND));
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.IDENTITY_NOT_FOUND));
+                return current;
+            }
+            // 不能指派领袖身份（只能经转让领袖获得）；不能改自己；只能指派低于自己优先级的身份，
+            // 且只能改动优先级不高于自己的成员
+            if (IdentityPermissions.isLeaderIdentity(roleId) || target.equals(actor)
+                || !(IdentityPermissions.identityOf(current, group.getGroupId(), actor).priority()
+                    > IdentityRegistry.INSTANCE.resolve(roleId).priority())
+                || !(IdentityPermissions.identityOf(current, group.getGroupId(), actor).priority()
+                    >= IdentityPermissions.identityOf(current, group.getGroupId(), target).priority())) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.CANNOT_ASSIGN));
                 return current;
             }
             upsertMemberRole(LandDaoManager.INSTANCE, group.getGroupId(), target, roleId);
@@ -334,8 +304,7 @@ public enum GroupService {
     public CompletableFuture<GroupOpResult> giveClaim(UUID actor, String groupName,
                                                       UUID worldUuid, int chunkX, int chunkZ) {
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
-            String actorRole = roleOf(current, group.getGroupId(), actor);
-            if (!Roles.OWNER.equals(actorRole) && !Roles.MANAGER.equals(actorRole)) {
+            if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_GIVE_CLAIM)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_MANAGER));
                 return current;
             }
@@ -349,6 +318,25 @@ public enum GroupService {
             if (!BuiltinOwnerTypes.PLAYER.equals(claim.getOwnerType())
                 || !claim.getOwnerId().equals(actor.toString())) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_CLAIM_OWNER));
+                return current;
+            }
+            // 目标组在该世界不能已有领地：否则会出现「同一所有者同世界多块地」，
+            // 而 ClaimService.findClaimInWorld 只返回第一块，导致后续扩容目标不确定
+            Set<String> groupClaims = current.claimsByOwner()
+                .getOrDefault(OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId()), Set.of());
+            for (String otherId : groupClaims) {
+                ClaimData other = current.claimsById().get(otherId);
+                if (other != null && worldUuid.equals(other.getWorldUuid())) {
+                    resultRef.set(GroupOpResult.failed(GroupFailureReason.GROUP_HAS_CLAIM));
+                    return current;
+                }
+            }
+            // 组额度：组已用区块（快照派生）+ 本领地区块数不得超过组容量
+            int chunks = current.chunksByClaim().getOrDefault(claimId, Set.of()).size();
+            long used = ClaimEngine.currentClaimedChunks(current,
+                OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId()));
+            if (used + chunks > groupCapacity(current, group.getGroupId())) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.GROUP_QUOTA_EXCEEDED));
                 return current;
             }
             // 只换所有者：区块、设置、flag、银行与生命周期状态全部保留
@@ -367,6 +355,8 @@ public enum GroupService {
             LandDaoManager.INSTANCE.claimDao().update(transferred);
             // 领地行改了所有者，claimsByOwner 必须按新归属重算
             DataSnapshot next = DataStore.reloadScoped(SnapshotPart.CLAIM, claim.getClaimId());
+            // 领地已转给组，捐赠者个人账本按剩余实际持有量校正，避免额度被永久占用
+            PlayerQuotaLedger.trimToActual(actor, next);
             notifyChanged(group.getGroupId());
             resultRef.set(GroupOpResult.ok(group.getGroupId()));
             return next;
@@ -391,6 +381,20 @@ public enum GroupService {
             OwnerRef.of(BuiltinOwnerTypes.GROUP, groupId));
     }
 
+    /**
+     * 转让领袖后，原领袖降为哪一级身份：取「非领袖身份中优先级最高者」
+     * （{@link IdentityRegistry#all()} 已按优先级降序，第一个非领袖即所求；默认配置即 {@code manager}）。
+     * 配置里只有领袖身份时，回落到默认（非成员）身份，保证降级后仍是一个已注册身份。
+     */
+    private static String formerLeaderIdentityId() {
+        for (Identity identity : IdentityRegistry.INSTANCE.all()) {
+            if (!identity.leader()) {
+                return identity.id();
+            }
+        }
+        return IdentityRegistry.INSTANCE.defaultIdentityId();
+    }
+
     private static @Nullable String roleOf(DataSnapshot snapshot, String groupId, UUID player) {
         GroupData group = snapshot.groups().get(groupId);
         if (group == null) {
@@ -401,11 +405,6 @@ public enum GroupService {
             return Roles.OWNER;
         }
         return role;
-    }
-
-    private static boolean isLeader(DataSnapshot snapshot, GroupData group, UUID player) {
-        return group.getLeaderUuid().equals(player)
-            || Roles.OWNER.equals(roleOf(snapshot, group.getGroupId(), player));
     }
 
     /**

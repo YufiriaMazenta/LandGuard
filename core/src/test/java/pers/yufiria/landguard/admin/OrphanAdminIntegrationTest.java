@@ -121,7 +121,7 @@ public class OrphanAdminIntegrationTest {
     private String groupClaim(String groupId, int baseX) {
         ClaimOpResult result = ClaimService.INSTANCE.claim(
             OwnerRef.of(BuiltinOwnerTypes.GROUP, groupId), world,
-            List.of(loc(baseX, 0)), nameOr(groupId), false).join();
+            List.of(loc(baseX, 0)), nameOr(groupId), false, ALICE).join();
         assertTrue(result.success());
         return result.claimId();
     }

@@ -43,7 +43,7 @@ public class CrossBoundaryRulesTest {
         return new DataSnapshot(
             new LinkedHashMap<>(), byChunk, new LinkedHashMap<>(), new LinkedHashMap<>(), roleFlags,
             new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>(),
-            new LinkedHashMap<>(), new LinkedHashMap<>()
+            new LinkedHashMap<>()
         );
     }
 

@@ -25,6 +25,8 @@ import pers.yufiria.landguard.data.DataSnapshot;
 import pers.yufiria.landguard.data.DataStore;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.economy.EconomyService;
+import pers.yufiria.landguard.identity.IdentityPermissions;
+import pers.yufiria.landguard.identity.PermissionPoint;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.ClaimOwnerRegistry;
 import pers.yufiria.landguard.owner.OwnerRef;
@@ -83,12 +85,17 @@ public class ClaimDetailMenu extends Menu {
                 Languages.MENU_DETAIL_UNCLAIM_NAME, Languages.MENU_DETAIL_UNCLAIM_LORE,
                 this::unclaimStanding));
         }
-        // 仅该领地的 owner 可改名 / 转让（个人领地=本人，用户组领地=领袖）
-        ClaimData detail = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
-        if (player != null && ClaimService.isOwner(detail, player.getUniqueId())) {
+        // 改名 / 转让按领地权限点判定（个人领地=本人，用户组领地=组内身份权限）
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        ClaimData detail = snapshot.claimsById().get(claimId);
+        if (player != null && IdentityPermissions.canActOnClaim(
+            snapshot, detail, player.getUniqueId(), PermissionPoint.CLAIM_RENAME)) {
             icons.put('n', () -> actionIcon(Material.NAME_TAG,
                 Languages.MENU_DETAIL_RENAME_NAME, Languages.MENU_DETAIL_RENAME_LORE,
                 this::startRename));
+        }
+        if (player != null && IdentityPermissions.canActOnClaim(
+            snapshot, detail, player.getUniqueId(), PermissionPoint.CLAIM_TRANSFER)) {
             icons.put('t', () -> actionIcon(Material.PLAYER_HEAD,
                 Languages.MENU_DETAIL_TRANSFER_NAME, Languages.MENU_DETAIL_TRANSFER_LORE,
                 this::startTransfer));

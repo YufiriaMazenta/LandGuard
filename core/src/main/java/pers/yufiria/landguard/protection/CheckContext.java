@@ -2,9 +2,9 @@ package pers.yufiria.landguard.protection;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import pers.yufiria.landguard.identity.IdentityRegistry;
 import pers.yufiria.landguard.owner.ClaimOwner;
 import pers.yufiria.landguard.owner.OwnerRef;
-import pers.yufiria.landguard.owner.Roles;
 
 /**
  * 一次判定的静态上下文：区块 → 领地 → 所有者实体 → 成员角色。
@@ -41,10 +41,11 @@ public record CheckContext(
     }
 
     /**
-     * 行为类判定使用的有效角色：非成员一律 visitor；野外/孤儿无角色语义（调用方先排除）。
+     * 行为类判定使用的有效角色：非成员一律按非成员默认身份（配置驱动，默认 visitor）；
+     * 野外/孤儿无角色语义（调用方先排除）。
      */
     public @NotNull String effectiveBehaviorRole() {
-        return memberRole != null ? memberRole : Roles.VISITOR;
+        return memberRole != null ? memberRole : IdentityRegistry.INSTANCE.defaultIdentityId();
     }
 
 }

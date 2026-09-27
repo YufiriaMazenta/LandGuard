@@ -3,7 +3,6 @@ package pers.yufiria.landguard.data;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.database.entity.ClaimData;
 import pers.yufiria.landguard.database.entity.GroupData;
-import pers.yufiria.landguard.database.entity.GroupRoleData;
 import pers.yufiria.landguard.database.entity.PlayerData;
 import pers.yufiria.landguard.owner.OwnerRef;
 
@@ -22,8 +21,7 @@ public record DataSnapshot(
     Map<String, Map<String, String>> settingsByClaim,
     Map<UUID, PlayerData> players,
     Map<String, GroupData> groups,
-    Map<String, Map<UUID, String>> groupMembers,
-    Map<String, Map<String, GroupRoleData>> groupRoles
+    Map<String, Map<UUID, String>> groupMembers
 ) {
 
     public DataSnapshot {
@@ -46,14 +44,10 @@ public record DataSnapshot(
         Map<String, Map<UUID, String>> immutableMembers = new LinkedHashMap<>();
         groupMembers.forEach((id, map) -> immutableMembers.put(id, Collections.unmodifiableMap(new LinkedHashMap<>(map))));
         groupMembers = Collections.unmodifiableMap(immutableMembers);
-        Map<String, Map<String, GroupRoleData>> immutableRoles = new LinkedHashMap<>();
-        groupRoles.forEach((id, map) -> immutableRoles.put(id, Collections.unmodifiableMap(new LinkedHashMap<>(map))));
-        groupRoles = Collections.unmodifiableMap(immutableRoles);
     }
 
     public static DataSnapshot empty() {
         return new DataSnapshot(
-            new LinkedHashMap<>(),
             new LinkedHashMap<>(),
             new LinkedHashMap<>(),
             new LinkedHashMap<>(),
@@ -87,25 +81,25 @@ public record DataSnapshot(
     /** 替换领地索引与它的派生索引，其余组件沿用本快照。 */
     public DataSnapshot withClaims(Map<String, ClaimData> claimsById, Map<OwnerRef, Set<String>> claimsByOwner) {
         return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
-            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers);
     }
 
     /** 替换区块归属的两个索引，其余组件沿用本快照。 */
     public DataSnapshot withChunkIndex(Map<ChunkLoc, String> claimIdByChunk, Map<String, Set<ChunkLoc>> chunksByClaim) {
         return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
-            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers);
     }
 
     /** 替换按领地的 flag 覆盖表，其余组件沿用本快照。 */
     public DataSnapshot withRoleFlags(Map<String, Map<String, Map<String, Boolean>>> roleFlagsByClaim) {
         return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
-            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers);
     }
 
     /** 替换按领地的设置表，其余组件沿用本快照。 */
     public DataSnapshot withSettings(Map<String, Map<String, String>> settingsByClaim) {
         return new DataSnapshot(claimsById, claimIdByChunk, chunksByClaim, claimsByOwner,
-            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers, groupRoles);
+            roleFlagsByClaim, settingsByClaim, players, groups, groupMembers);
     }
 
 }
