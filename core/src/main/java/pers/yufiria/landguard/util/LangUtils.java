@@ -80,9 +80,9 @@ public class LangUtils {
         }
         Locale locale = player.locale();
         Map<String, String> params = new HashMap<>(formatMap);
-        params.put("<prefix>", locale == null ? Languages.PREFIX.value() : Languages.PREFIX.value(locale));
+        params.put("<prefix>", Languages.PREFIX.value(locale));
         params.put("<version>", LandGuard.instance().getDescription().getVersion());
-        player.sendActionBar(locale == null ? message.value() : message.value(locale), params);
+        player.sendActionBar(message.value(locale), params);
     }
 
     /**
@@ -93,15 +93,13 @@ public class LangUtils {
                                           Map<String, String> formatMap) {
         Locale locale = player.locale();
         Map<String, String> params = new HashMap<>(formatMap);
-        params.put("<prefix>", locale == null ? Languages.PREFIX.value() : Languages.PREFIX.value(locale));
+        params.put("<prefix>", Languages.PREFIX.value(locale));
         params.put("<version>", LandGuard.instance().getDescription().getVersion());
-        String text = locale == null ? message.value() : message.value(locale);
+        String text = message.value(locale);
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         // 与 BukkitInvoker.sendMsg 一致的三步：占位符 -> PAPI -> 颜色 -> 组件
         text = StringHelper.replaceStrings(text, params);
-        if (bukkitPlayer != null) {
-            text = BukkitTextProcessor.placeholder(bukkitPlayer, text);
-        }
+        text = BukkitTextProcessor.placeholder(bukkitPlayer, text);
         return BukkitTextProcessor.toComponent(BukkitTextProcessor.color(text));
     }
 
