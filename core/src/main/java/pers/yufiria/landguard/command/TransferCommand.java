@@ -123,7 +123,7 @@ public final class TransferCommand extends CommandNode {
             LangUtils.sendLang(player, Languages.COMMAND_TRANSFER_FAIL_GROUP_NOT_FOUND);
             return;
         }
-        AsyncReply.toPlayer(bukkitPlayer, GroupService.INSTANCE.giveClaim(player.uniqueId(), group.getName(),
+        AsyncReply.toPlayer(bukkitPlayer, GroupService.INSTANCE.giveClaim(player.uniqueId(), group.getGroupId(),
                 bukkitPlayer.getWorld().getUID(),
                 bukkitPlayer.getLocation().getBlockX() >> 4,
                 bukkitPlayer.getLocation().getBlockZ() >> 4), result -> {
