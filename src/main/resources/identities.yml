@@ -69,3 +69,4 @@ identities:
     default: true
     behaviors:
       - crafting
+      - item
