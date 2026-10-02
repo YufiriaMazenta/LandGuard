@@ -28,6 +28,10 @@ public enum GroupFailureReason {
     /** 目标用户组在该世界已有领地（不合并，避免同一所有者同世界多块地） */
     GROUP_HAS_CLAIM,
     /** 目标用户组的区块额度不足以接收这块领地 */
-    GROUP_QUOTA_EXCEEDED
+    GROUP_QUOTA_EXCEEDED,
+    /** 可加入的用户组数已达上限（含自己拥有的组织） */
+    JOIN_LIMIT_EXCEEDED,
+    /** 可拥有的用户组数已达上限 */
+    OWN_LIMIT_EXCEEDED
 
 }

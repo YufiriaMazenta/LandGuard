@@ -95,6 +95,8 @@ LandGuard 以 **16×16 区块**为最小领地单位，所有权通过 SPI 抽�
 | `landguard.command.group.role.assign` / `.list` | OP | 指派成员身份 / 列出全部身份 |
 | `landguard.command.admin` | OP | `/land admin` 子命令树根（无参时输出用法） |
 | `landguard.command.admin.<动作>` | OP | `claim`、`unclaim`、`transfer`、`release`、`exempt`、`rename`、`info`、`orphans`、`run` |
+| `landguard.group.join_group_limit.<N>` | **false（含 OP）** | 最多加入 N 个用户组，**自己拥有的组织也计入**；未授予视为 0（不能加入），同时授予多个 N 时取最大 |
+| `landguard.group.own_group_limit.<N>` | **false（含 OP）** | 最多拥有 N 个用户组（组内身份为领袖身份）；未授予视为 0（不能创建/接管） |
 | `landguard.bypass` | **false（含 OP）** | 绕过全部行为保护判定，必须显式分配 |
 
 ## 开发者：接入自有组织系统

@@ -113,6 +113,8 @@ command:
       not_claim_owner: '<prefix> &c只能把你自己名下的个人领地转让给用户组'
       group_has_claim: '<prefix> &c该用户组在这个世界已经有领地了，无法再接收新的领地'
       group_quota_exceeded: '<prefix> &c该用户组的区块额度不足，无法接收这块领地'
+      join_limit_exceeded: '<prefix> &c你加入的用户组数量已达上限（拥有的组织也计入），无法加入新的用户组'
+      own_limit_exceeded: '<prefix> &c你拥有的用户组数量已达上限，无法创建或接管新的用户组'
       target_not_found: '<prefix> &c找不到该玩家（需要在线或曾经进服留有缓存）'
   economy:
     unavailable: '<prefix> &c经济功能当前不可用（未安装 Vault 经济或已被服务器关闭），买卖与银行操作已禁用'

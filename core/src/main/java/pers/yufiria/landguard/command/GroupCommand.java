@@ -431,6 +431,8 @@ public final class GroupCommand extends CommandNode {
                 case NOT_CLAIM_OWNER -> Languages.COMMAND_GROUP_FAIL_NOT_CLAIM_OWNER;
                 case GROUP_HAS_CLAIM -> Languages.COMMAND_GROUP_FAIL_GROUP_HAS_CLAIM;
                 case GROUP_QUOTA_EXCEEDED -> Languages.COMMAND_GROUP_FAIL_GROUP_QUOTA_EXCEEDED;
+                case JOIN_LIMIT_EXCEEDED -> Languages.COMMAND_GROUP_FAIL_JOIN_LIMIT_EXCEEDED;
+                case OWN_LIMIT_EXCEEDED -> Languages.COMMAND_GROUP_FAIL_OWN_LIMIT_EXCEEDED;
             };
         }
         LangUtils.sendLang(player, entry);

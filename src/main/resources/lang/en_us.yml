@@ -113,6 +113,8 @@ command:
       not_claim_owner: '<prefix> &cOnly your own personal claim can be transferred to a group'
       group_has_claim: '<prefix> &cThat group already owns a claim in this world'
       group_quota_exceeded: '<prefix> &cThat group does not have enough chunk quota for this claim'
+      join_limit_exceeded: '<prefix> &cYou have reached your group join limit (owned groups also count); you cannot join another group'
+      own_limit_exceeded: '<prefix> &cYou have reached your group ownership limit; you cannot create or take over another group'
       target_not_found: '<prefix> &cPlayer not found (must be online or cached from a previous login)'
   economy:
     unavailable: '<prefix> &cEconomy is unavailable (no Vault economy installed or disabled); trading and bank are disabled'

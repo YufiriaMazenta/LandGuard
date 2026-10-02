@@ -125,6 +125,8 @@ public class Languages {
     public static final StringLangEntry COMMAND_GROUP_FAIL_NOT_CLAIM_OWNER = new StringLangEntry("command.group.fail.not_claim_owner");
     public static final StringLangEntry COMMAND_GROUP_FAIL_GROUP_HAS_CLAIM = new StringLangEntry("command.group.fail.group_has_claim");
     public static final StringLangEntry COMMAND_GROUP_FAIL_GROUP_QUOTA_EXCEEDED = new StringLangEntry("command.group.fail.group_quota_exceeded");
+    public static final StringLangEntry COMMAND_GROUP_FAIL_JOIN_LIMIT_EXCEEDED = new StringLangEntry("command.group.fail.join_limit_exceeded");
+    public static final StringLangEntry COMMAND_GROUP_FAIL_OWN_LIMIT_EXCEEDED = new StringLangEntry("command.group.fail.own_limit_exceeded");
     public static final StringLangEntry COMMAND_GROUP_FAIL_TARGET_NOT_FOUND = new StringLangEntry("command.group.fail.target_not_found");
 
     // ================= 经济 =================

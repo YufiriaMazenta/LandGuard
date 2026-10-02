@@ -1,6 +1,7 @@
 package pers.yufiria.landguard.group;
 
 import crypticlib.database.dao.Dao;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.claim.ClaimEngine;
 import pers.yufiria.landguard.claim.PlayerQuotaLedger;
@@ -47,7 +48,18 @@ public enum GroupService {
     /** groupId -> 被邀请玩家集合（内存态） */
     private final Map<String, Set<UUID>> pendingInvites = new ConcurrentHashMap<>();
 
+    /**
+     * 组织数量上限解析器：默认不限制（无平台环境），
+     * 生产环境由 {@link GroupLimitInitializer} 在启动/重载时注入权限实现。
+     */
+    private volatile GroupLimitResolver limitResolver = GroupLimitResolver.noLimits();
+
     // ================= 组生命周期 =================
+
+    /** 启动期注入上限解析器；见 {@link GroupLimitInitializer}。 */
+    public void setLimitResolver(@NotNull GroupLimitResolver resolver) {
+        this.limitResolver = resolver;
+    }
 
     /**
      * 建组：{@code groupId} 是玩家自选的短标识符（唯一、创建后不可改），
@@ -62,9 +74,21 @@ public enum GroupService {
         if (wantedName == null) {
             return failed(GroupFailureReason.INVALID_NAME);
         }
+        // 上限在进入写线程前解析：权限查询属于平台能力，只在调用方线程做一次
+        int ownLimit = limitResolver.ownLimit(creator);
+        int joinLimit = limitResolver.joinLimit(creator);
         return mutate(resultRef -> current -> {
             if (current.groups().containsKey(wantedId)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.KEY_TAKEN));
+                return current;
+            }
+            // 建组同时占用一个「拥有」名额与一个「加入」名额（拥有视为已加入）
+            if (limitReached(ownLimit, countOwned(current, creator))) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.OWN_LIMIT_EXCEEDED));
+                return current;
+            }
+            if (limitReached(joinLimit, countJoined(current, creator))) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.JOIN_LIMIT_EXCEEDED));
                 return current;
             }
             long now = System.currentTimeMillis();
@@ -157,6 +181,7 @@ public enum GroupService {
         if (wanted == null) {
             return failed(GroupFailureReason.INVALID_KEY);
         }
+        int joinLimit = accept ? limitResolver.joinLimit(player) : GroupLimitResolver.NO_LIMIT;
         return mutate(resultRef -> current -> {
             GroupData group = findById(current, wanted);
             if (group == null) {
@@ -164,18 +189,26 @@ public enum GroupService {
                 return current;
             }
             Set<UUID> invites = pendingInvites.get(group.getGroupId());
-            if (invites == null || !invites.remove(player)) {
+            if (invites == null || !invites.contains(player)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NO_INVITE));
                 return current;
             }
             if (!accept) {
+                invites.remove(player);
                 resultRef.set(GroupOpResult.ok(group.getGroupId()));
                 return current;
             }
             if (roleOf(current, group.getGroupId(), player) != null) {
+                invites.remove(player);
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.ALREADY_MEMBER));
                 return current;
             }
+            // 上限判定失败时不消耗邀请：腾出名额后仍可再次 accept
+            if (limitReached(joinLimit, countJoined(current, player))) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.JOIN_LIMIT_EXCEEDED));
+                return current;
+            }
+            invites.remove(player);
             LandDaoManager.INSTANCE.groupMemberDao()
                 .create(new GroupMemberData(group.getGroupId(), player, Roles.MEMBER));
             DataSnapshot next = DataStore.reload(SnapshotPart.GROUP_MEMBER);
@@ -228,6 +261,8 @@ public enum GroupService {
     }
 
     public CompletableFuture<GroupOpResult> transferLeadership(UUID actor, String groupName, UUID target) {
+        // 接收者将因此多拥有一个组织，需先按其权限解析上限（写线程内不再做平台查询）
+        int targetOwnLimit = limitResolver.ownLimit(target);
         return withGroup(actor, groupName, resultRef -> (current, group) -> {
             if (!IdentityPermissions.has(current, group.getGroupId(), actor, PermissionPoint.GROUP_TRANSFER)) {
                 resultRef.set(GroupOpResult.failed(GroupFailureReason.NOT_LEADER));
@@ -239,6 +274,10 @@ public enum GroupService {
             }
             if (target.equals(actor)) {
                 resultRef.set(GroupOpResult.ok(group.getGroupId()));
+                return current;
+            }
+            if (limitReached(targetOwnLimit, countOwned(current, target))) {
+                resultRef.set(GroupOpResult.failed(GroupFailureReason.OWN_LIMIT_EXCEEDED));
                 return current;
             }
             LandDaoManager daos = LandDaoManager.INSTANCE;
@@ -379,6 +418,33 @@ public enum GroupService {
     private void notifyChanged(String groupId) {
         ClaimOwnerRegistry.INSTANCE.notifyMembershipChanged(
             OwnerRef.of(BuiltinOwnerTypes.GROUP, groupId));
+    }
+
+    /** 是否已达上限：{@link GroupLimitResolver#NO_LIMIT} 永不判满（再取得一个即超额）。 */
+    private static boolean limitReached(int limit, int current) {
+        return limit != GroupLimitResolver.NO_LIMIT && current >= limit;
+    }
+
+    /** 已加入的用户组数：拥有视为已加入，故领袖（含无成员行的历史数据）一并计入。 */
+    private static int countJoined(DataSnapshot snapshot, UUID player) {
+        int count = 0;
+        for (String groupId : snapshot.groups().keySet()) {
+            if (IdentityPermissions.isMember(snapshot, groupId, player)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** 已拥有的用户组数：以快照中的领袖字段为准（即组内身份为领袖身份）。 */
+    private static int countOwned(DataSnapshot snapshot, UUID player) {
+        int count = 0;
+        for (String groupId : snapshot.groups().keySet()) {
+            if (IdentityPermissions.isLeader(snapshot, groupId, player)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     /**
