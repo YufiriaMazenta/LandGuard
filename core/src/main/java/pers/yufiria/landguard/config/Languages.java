@@ -157,7 +157,11 @@ public class Languages {
     // ================= 管理命令 =================
     public static final StringLangEntry COMMAND_ADMIN_USAGE = new StringLangEntry("command.admin.usage");
     public static final StringLangEntry COMMAND_ADMIN_CLAIM_SUCCESS = new StringLangEntry("command.admin.claim.success");
+    public static final StringLangEntry COMMAND_ADMIN_CLAIM_AUTO_ON = new StringLangEntry("command.admin.claim.auto_on");
+    public static final StringLangEntry COMMAND_ADMIN_CLAIM_AUTO_OFF = new StringLangEntry("command.admin.claim.auto_off");
     public static final StringLangEntry COMMAND_ADMIN_UNCLAIM_SUCCESS = new StringLangEntry("command.admin.unclaim.success");
+    public static final StringLangEntry COMMAND_ADMIN_UNCLAIM_AUTO_ON = new StringLangEntry("command.admin.unclaim.auto_on");
+    public static final StringLangEntry COMMAND_ADMIN_UNCLAIM_AUTO_OFF = new StringLangEntry("command.admin.unclaim.auto_off");
     public static final StringLangEntry COMMAND_ADMIN_RELEASE_SUCCESS = new StringLangEntry("command.admin.release.success");
     public static final StringLangEntry COMMAND_ADMIN_TRANSFER_SUCCESS = new StringLangEntry("command.admin.transfer.success");
     public static final StringLangEntry COMMAND_ADMIN_EXEMPT_SET = new StringLangEntry("command.admin.exempt.set");

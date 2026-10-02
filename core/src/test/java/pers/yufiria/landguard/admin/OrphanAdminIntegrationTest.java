@@ -36,7 +36,8 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * TR-11.1：解散组织后领地进入孤儿列表，越过宽限期自动释放；管理领地永不进孤儿流程；
+ * TR-11.1：所有者实体不可解析的领地（历史版本解散组遗留的数据、第三方提供方注销）进入孤儿列表，
+ * 越过宽限期自动释放；管理领地永不进孤儿流程；
  * 管理员强制认领/放弃/转让/释放/豁免的额度与生命周期行为；手动回收合并两条扫描链。
  */
 public class OrphanAdminIntegrationTest {
@@ -135,18 +136,31 @@ public class OrphanAdminIntegrationTest {
         return LandDaoManager.INSTANCE.claimDao().queryForId(claimId);
     }
 
+    /**
+     * 模拟历史数据：组行与成员行已从库里消失但名下领地仍在
+     * （旧版本解散组织会留下这类孤儿数据；当前版本的解散已不会产生）。
+     */
+    private void vanishGroup(String groupId) throws Exception {
+        var memberDelete = LandDaoManager.INSTANCE.groupMemberDao().deleteBuilder();
+        memberDelete.where(w -> w.equals("group_id", groupId));
+        memberDelete.delete();
+        var groupDelete = LandDaoManager.INSTANCE.groupDao().deleteBuilder();
+        groupDelete.where(w -> w.equals("group_id", groupId));
+        groupDelete.delete();
+        DataStore.INSTANCE.reloadFrom(connection).join();
+    }
+
     // ================= 孤儿宽限（TR-11.1 主链路） =================
 
     @Test
-    void disbandedGroupClaimOrphanListThenWarnAndReleaseAtBoundary() throws Exception {
+    void vanishedGroupClaimOrphanListThenWarnAndReleaseAtBoundary() throws Exception {
         player(ALICE);
         String groupId = createGroup("Guild");
         String claimId = groupClaim(groupId, 0);
         assertTrue(OrphanService.INSTANCE.listOrphans().isEmpty());
 
-        // 解散组：领地保留，立即出现在孤儿列表（尚未扫描时 orphanSince=0）
-        GroupOpResult disbanded = GroupService.INSTANCE.disband(ALICE, "Guild").join();
-        assertTrue(disbanded.success());
+        // 组数据已消失（历史遗留）：领地保留，立即出现在孤儿列表（尚未扫描时 orphanSince=0）
+        vanishGroup(groupId);
         List<OrphanInfo> orphans = OrphanService.INSTANCE.listOrphans();
         assertEquals(1, orphans.size());
         assertEquals(claimId, orphans.get(0).claimId());
@@ -182,7 +196,7 @@ public class OrphanAdminIntegrationTest {
         player(ALICE);
         String groupId = createGroup("Guild");
         String claimId = groupClaim(groupId, 2);
-        GroupService.INSTANCE.disband(ALICE, "Guild").join();
+        vanishGroup(groupId);
         assertEquals(1, OrphanService.INSTANCE.runCycle(t(0)).join().notices().size());
         assertEquals(t(0), fresh(claimId).getOrphanSince());
 
@@ -346,7 +360,7 @@ public class OrphanAdminIntegrationTest {
         player(ALICE);
         String groupId = createGroup("Guild");
         groupClaim(groupId, 8);
-        GroupService.INSTANCE.disband(ALICE, "Guild").join();
+        vanishGroup(groupId);
 
         UpkeepCycleResult result = AdminService.INSTANCE.runMaintenance(t(0)).join();
         assertEquals(1, result.notices().size());

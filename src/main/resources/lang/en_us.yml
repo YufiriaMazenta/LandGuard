@@ -62,7 +62,7 @@ command:
     create:
       success: '<prefix> &aGroup &f<group>&a created; you are the leader'
     disband:
-      success: '<prefix> &eGroup &f<group>&e disbanded; its claims are now orphaned and await an admin'
+      success: '<prefix> &eGroup &f<group>&e disbanded; its claims have been released'
     invite:
       sent: '<prefix> &aInvited &f<player>&a to group &f<group>'
       received: '<prefix> &a<leader> invited you to group &f<group>&a. Use &f/land group accept <group_id>&a to join'
@@ -138,11 +138,15 @@ command:
     forbidden: '<prefix> &cYour role is not allowed to withdraw from this claim bank'
     empty: '<prefix> &cThe claim bank does not have enough funds'
   admin:
-    usage: '<prefix> &eUsage: &f/land admin claim|unclaim [radius]&7, &ftransfer <player>&7, &frelease <claimId>&7, &fexempt <true|false>&7, &frename <new name>&7, &finfo&7, &forphans&7, &frun'
+    usage: '<prefix> &eUsage: &f/land admin claim|unclaim [radius <n>|auto]&7, &ftransfer <player>&7, &frelease <claimId>&7, &fexempt <true|false>&7, &frename <new name>&7, &finfo&7, &forphans&7, &frun'
     claim:
       success: '<prefix> &aCreated an admin claim (owned by server) covering &f<count>&a chunks; quota/adjacency limits and upkeep do not apply'
+      auto_on: '<prefix> &aWalk auto admin-claim enabled: entering an unclaimed chunk will create/expand an admin claim (owned by server)'
+      auto_off: '<prefix> &eWalk auto admin-claim disabled'
     unclaim:
       success: '<prefix> &eForce-unclaimed &f<count>&e chunks (ownership not checked, no quota refund)'
+      auto_on: '<prefix> &aWalk auto force-unclaim enabled: entering any claimed chunk will remove it (ownership not checked, no quota refund)'
+      auto_off: '<prefix> &eWalk auto force-unclaim disabled'
     release:
       success: '<prefix> &eForce-released claim &f<claim>&e (&f<chunks>&e chunks returned to the wild)'
     transfer:
@@ -307,7 +311,7 @@ menu:
       rename_prompt: '<prefix> &eType the new group display name in chat, or &fcancel &eto abort'
       disband_name: '&cDisband group'
       disband_lore: '&7Shift+left-click to confirm disbanding'
-      disband_confirm: '<prefix> &cDisbanding cannot be undone; hold &fShift &cand left-click this icon to confirm'
+      disband_confirm: '<prefix> &cDisbanding cannot be undone and its claims will be released; hold &fShift &cand left-click this icon to confirm'
       leave_name: '&eLeave group'
       leave_lore: '&7Group claim permissions are revoked immediately'
       accept_name: '&aAccept invite'

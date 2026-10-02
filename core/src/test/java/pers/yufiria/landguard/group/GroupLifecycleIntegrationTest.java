@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * TR-7.1 / AC-3 / AC-6（组侧）：邀请加入/踢出即时生效、成员身份随组持久化、
- * 领袖转让、领地转让给组、解散触发孤儿流程、组额度公式。
+ * 领袖转让、领地转让给组、解散释放名下领地、组额度公式。
  */
 public class GroupLifecycleIntegrationTest {
 
@@ -175,8 +175,11 @@ public class GroupLifecycleIntegrationTest {
     }
 
     @Test
-    void disbandOrphansClaimsAndLeaderCannotLeave() {
+    void disbandReleasesClaimsAndLeaderCannotLeave() throws Exception {
         String groupId = createGuild();
+        placeGroupClaim(groupId, 0, 0);
+        String claimId = DataStore.INSTANCE.snapshot().claimIdByChunk().get(ChunkLoc.of(world, 0, 0));
+        assertNotNull(claimId);
 
         // 领袖不能直接退出
         assertEquals(GroupFailureReason.LEADER_CANNOT_LEAVE,
@@ -186,6 +189,12 @@ public class GroupLifecycleIntegrationTest {
         assertTrue(disbanded.success());
         assertNull(ClaimOwnerRegistry.INSTANCE.resolve(OwnerRef.of(BuiltinOwnerTypes.GROUP, groupId)));
         assertEquals(1, ownerRemovedEvents.get(), "解散发出 OWNER_REMOVED 失效通知");
+
+        // 名下领地在解散时一并释放：快照索引与数据库行都不再存在
+        DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
+        assertFalse(snapshot.claimIdByChunk().containsKey(ChunkLoc.of(world, 0, 0)));
+        assertFalse(snapshot.claimsById().containsKey(claimId));
+        assertNull(LandDaoManager.INSTANCE.claimDao().queryForId(claimId));
     }
 
     @Test

@@ -70,12 +70,13 @@ The `lg_group_role` table used by the old custom-role feature is no longer used.
 | `/land boundary` | Toggle particle boundary rendering on claim entry (per player, on by default) |
 | `/land rename <new name>` | Rename the claim you stand on (owner only; spaces allowed, up to 32 characters) |
 | `/land transfer --player <player>` / `--group <group id>` | Transfer the claim you stand on to another player or group (owner only) |
-| `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|rename\|role\|list\|info` | Group management (`transfer` transfers group leadership, `rename` changes the display name) |
+| `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|rename\|role\|list\|info` | Group management (`transfer` transfers group leadership, `rename` changes the display name; disbanding also releases all of the group's claims) |
 | `/land group role assign <group id> <player> <identity>` | Assign a member identity (identities come from `identities.yml`) |
 | `/land group role list [group id]` | List all identities (id / display name / priority / permission count / behavior count); with a group id, also the member count per identity |
 | `/land buy <amount>` / `/land sell <amount>` | Buy/sell chunk quota (economy required) |
 | `/land bank [deposit\|withdraw <amount>]` | Claim bank (economy required) |
-| `/land admin claim\|unclaim\|transfer\|release\|exempt\|rename\|info\|orphans\|run` | Administration |
+| `/land admin claim\|unclaim [radius <r> \| auto]` | Admin claiming / force-unclaiming: in-place 3×3 without arguments, `radius` for a square batch, `auto` toggles walk auto mode (admin claims are server-owned; force-unclaim ignores ownership) |
+| `/land admin transfer\|release\|exempt\|rename\|info\|orphans\|run` | Force transfer / release / upkeep exemption / rename / info / orphan list / run maintenance cycle manually |
 | `/land reload` / `/land version` | Reload / version |
 
 Aliases: `landguard`, `lg` (configurable in `config.yml`).

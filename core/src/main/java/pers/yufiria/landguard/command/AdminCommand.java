@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.admin.*;
+import pers.yufiria.landguard.claim.AutoModeManager;
 import pers.yufiria.landguard.claim.ClaimEngine;
 import pers.yufiria.landguard.claim.ClaimMessages;
 import pers.yufiria.landguard.claim.ClaimService;
@@ -43,6 +44,8 @@ import java.util.function.BiConsumer;
 /**
  * {@code /land admin ...}：管理领地创建/删除、强制放弃/转让、信息查看、
  * 孤儿领地列表与处理、手动触发回收（FR-9.1）。
+ * {@code claim} / {@code unclaim} 与普通认领命令同构：无参就地 3×3，另有
+ * {@code radius <半径>} 批量与 {@code auto} 行走自动两个子命令。
  * 子命令交由框架节点树分派（{@code @Subcommand}）：每个动作独立权限节点、独立补全，
  * 参数列表已去掉动作名（{@code args.get(0)} 即该动作的第一个参数）。
  * 权限节点 {@code landguard.command.admin.*} 与保护绕过节点 {@code landguard.bypass} 相互独立：
@@ -64,9 +67,9 @@ public final class AdminCommand extends CommandNode {
     // ================= 子命令节点 =================
 
     @Subcommand
-    CommandNode claim = action("claim", this::claim);
+    CommandNode claim = new BatchNode("claim", this::claim, this::claimRadius, this::claimAuto);
     @Subcommand
-    CommandNode unclaim = action("unclaim", this::unclaim);
+    CommandNode unclaim = new BatchNode("unclaim", this::unclaim, this::unclaimRadius, this::unclaimAuto);
     @Subcommand
     CommandNode transfer = action("transfer", this::transfer, players());
     @Subcommand
@@ -100,6 +103,27 @@ public final class AdminCommand extends CommandNode {
         return new PlayerOnlyCommand(PERM_PREFIX + name, name, handler, completer);
     }
 
+    /**
+     * {@code /land admin claim|unclaim ...}：二级节点，自身回落到就地 3×3；
+     * {@code radius <半径>} 与 {@code auto} 与普通认领命令同名同义，三个入口共用同一权限节点
+     * （同一能力的变体，拆分会让只授过根节点的管理员平白失去批量与自动入口）。
+     */
+    static final class BatchNode extends PlayerOnlyCommand {
+
+        @Subcommand
+        CommandNode radius;
+        @Subcommand
+        CommandNode auto;
+
+        BatchNode(String name, BiConsumer<CommonPlayer, List<String>> inPlace,
+                  BiConsumer<CommonPlayer, List<String>> radiusAction,
+                  BiConsumer<CommonPlayer, List<String>> autoAction) {
+            super(PERM_PREFIX + name, name, inPlace);
+            this.radius = new PlayerOnlyCommand(PERM_PREFIX + name, "radius", radiusAction);
+            this.auto = new PlayerOnlyCommand(PERM_PREFIX + name, "auto", autoAction);
+        }
+    }
+
     // ================= 参数补全 =================
 
     /** 第一参数为在线玩家名。 */
@@ -114,16 +138,44 @@ public final class AdminCommand extends CommandNode {
 
     // ================= 管理领地创建/删除 =================
 
+    /** {@code /land admin claim}：就地 3×3 管理认领。 */
     private void claim(CommonPlayer player, List<String> args) {
+        if (!args.isEmpty()) {
+            LangUtils.sendLang(player, Languages.COMMAND_ADMIN_USAGE);
+            return;
+        }
+        claimAt(player, 1);
+    }
+
+    /** {@code /land admin claim radius <半径>}：以站立区块为中心的方形批量管理认领。 */
+    private void claimRadius(CommonPlayer player, List<String> args) {
         int radius = parseRadius(player, args);
         if (radius < 0) {
             return;
         }
+        claimAt(player, radius);
+    }
+
+    /** {@code /land admin claim auto}：切换行走自动管理认领。 */
+    private void claimAuto(CommonPlayer player, List<String> args) {
+        if (!args.isEmpty()) {
+            LangUtils.sendLang(player, Languages.COMMAND_ADMIN_USAGE);
+            return;
+        }
+        AutoModeManager.AutoState state = AutoModeManager.INSTANCE.toggle(
+            player.uniqueId(), AutoModeManager.Mode.ADMIN_CLAIM);
+        LangUtils.sendLang(player, state.mode() == AutoModeManager.Mode.ADMIN_CLAIM
+            ? Languages.COMMAND_ADMIN_CLAIM_AUTO_ON
+            : Languages.COMMAND_ADMIN_CLAIM_AUTO_OFF);
+    }
+
+    private void claimAt(CommonPlayer player, int radius) {
         List<ChunkLoc> targets = standingTargets(player, radius);
         OwnerRef server = OwnerRef.of(BuiltinOwnerTypes.SERVER, ServerClaimOwner.ID);
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         AsyncReply.toPlayer(bukkitPlayer,
-            ClaimService.INSTANCE.claim(server, bukkitPlayer.getWorld().getUID(), targets, "Admin Claim", true),
+            ClaimService.INSTANCE.claim(server, bukkitPlayer.getWorld().getUID(), targets,
+                ClaimService.ADMIN_CLAIM_NAME, true),
             result -> {
                 if (result.success()) {
                     LangUtils.sendLang(player, Languages.COMMAND_ADMIN_CLAIM_SUCCESS,
@@ -135,11 +187,38 @@ public final class AdminCommand extends CommandNode {
             });
     }
 
+    /** {@code /land admin unclaim}：就地强制放弃 3×3。 */
     private void unclaim(CommonPlayer player, List<String> args) {
+        if (!args.isEmpty()) {
+            LangUtils.sendLang(player, Languages.COMMAND_ADMIN_USAGE);
+            return;
+        }
+        unclaimAt(player, 1);
+    }
+
+    /** {@code /land admin unclaim radius <半径>}：方形批量强制放弃。 */
+    private void unclaimRadius(CommonPlayer player, List<String> args) {
         int radius = parseRadius(player, args);
         if (radius < 0) {
             return;
         }
+        unclaimAt(player, radius);
+    }
+
+    /** {@code /land admin unclaim auto}：切换行走自动强制放弃。 */
+    private void unclaimAuto(CommonPlayer player, List<String> args) {
+        if (!args.isEmpty()) {
+            LangUtils.sendLang(player, Languages.COMMAND_ADMIN_USAGE);
+            return;
+        }
+        AutoModeManager.AutoState state = AutoModeManager.INSTANCE.toggle(
+            player.uniqueId(), AutoModeManager.Mode.ADMIN_UNCLAIM);
+        LangUtils.sendLang(player, state.mode() == AutoModeManager.Mode.ADMIN_UNCLAIM
+            ? Languages.COMMAND_ADMIN_UNCLAIM_AUTO_ON
+            : Languages.COMMAND_ADMIN_UNCLAIM_AUTO_OFF);
+    }
+
+    private void unclaimAt(CommonPlayer player, int radius) {
         Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
         List<ChunkLoc> targets = standingTargets(player, radius);
         AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.adminUnclaim(targets), result -> {
@@ -345,11 +424,12 @@ public final class AdminCommand extends CommandNode {
     }
 
     /**
-     * 解析可选的 [radius] 参数：缺省为 1；非法返回 -1（已向玩家反馈）。
+     * 解析 {@code radius <半径>} 的半径参数：缺失或非法返回 -1（已向玩家反馈）。
      */
     private static int parseRadius(CommonPlayer player, List<String> args) {
         if (args.isEmpty()) {
-            return 1;
+            LangUtils.sendLang(player, Languages.COMMAND_CLAIM_RADIUS_INVALID);
+            return -1;
         }
         int radius;
         try {

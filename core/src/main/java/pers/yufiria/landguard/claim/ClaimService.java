@@ -37,6 +37,9 @@ public enum ClaimService {
     /** 领地名长度上限，与用户组名上限保持一致。 */
     private static final int MAX_CLAIM_NAME_LENGTH = 32;
 
+    /** 管理领地（server 所有）的默认名称：{@code /land admin claim} 与行走自动管理认领共用。 */
+    public static final String ADMIN_CLAIM_NAME = "Admin Claim";
+
     /**
      * 认领一批区块（首个领地自动创建，同世界已有领地则扩容到该领地）。
      * 已属于任何领地（含操作者本人）的目标区块会被跳过，只认领剩余部分；

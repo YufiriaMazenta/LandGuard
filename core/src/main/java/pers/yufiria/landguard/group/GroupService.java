@@ -4,6 +4,7 @@ import crypticlib.database.dao.Dao;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import pers.yufiria.landguard.claim.ClaimEngine;
+import pers.yufiria.landguard.claim.ClaimRelease;
 import pers.yufiria.landguard.claim.PlayerQuotaLedger;
 import pers.yufiria.landguard.config.ClaimConfigs;
 import pers.yufiria.landguard.data.ChunkLoc;
@@ -36,7 +37,7 @@ import java.util.regex.Pattern;
  * 内置用户组领域服务（FR-6）。
  * 所有变更都经 {@link DataStore#mutate} 单写线程原子完成；成功后通过 SPI 发出成员失效通知，
  * 在线玩家无需重登即可获得/失去权限。邀请数据为内存态（重启清空，不建表）。
- * 组解散时不删除其名下领地——所有者变为不可解析，领地进入孤儿流程（Task 11 处理）。
+ * 组解散时其名下领地在同一写线程内一并释放（区块、flag、设置与领地行全部删除）。
  */
 public enum GroupService {
 
@@ -140,7 +141,18 @@ public enum GroupService {
             daos.groupDao().delete(group);
             pendingInvites.remove(group.getGroupId());
             DataSnapshot next = DataStore.reload(SnapshotPart.GROUP, SnapshotPart.GROUP_MEMBER);
-            // 名下领地不删除：提供者将无法解析该所有者 → 孤儿流程
+            // 组没了，名下领地一并释放：否则所有者不可解析，会滞留孤儿流程
+            Set<String> claimIds = new LinkedHashSet<>(current.claimsByOwner()
+                .getOrDefault(OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId()), Set.of()));
+            for (String claimId : claimIds) {
+                ClaimRelease.release(daos, current, claimId);
+            }
+            for (String claimId : claimIds) {
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM, claimId);
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM_CHUNK, claimId);
+                next = DataStore.reloadScoped(SnapshotPart.ROLE_FLAG, claimId);
+                next = DataStore.reloadScoped(SnapshotPart.CLAIM_SETTING, claimId);
+            }
             ClaimOwnerRegistry.INSTANCE.notifyOwnerRemoved(
                 OwnerRef.of(BuiltinOwnerTypes.GROUP, group.getGroupId()));
             resultRef.set(GroupOpResult.ok(group.getGroupId()));

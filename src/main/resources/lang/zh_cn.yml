@@ -62,7 +62,7 @@ command:
     create:
       success: '<prefix> &a用户组 &f<group>&a 创建成功，你是领袖'
     disband:
-      success: '<prefix> &e用户组 &f<group>&e 已解散；其名下领地已进入无主流程，请等待管理员处理'
+      success: '<prefix> &e用户组 &f<group>&e 已解散；其名下领地已一并释放'
     invite:
       sent: '<prefix> &a已邀请 &f<player>&a 加入用户组 &f<group>'
       received: '<prefix> &a<leader> 邀请你加入用户组 &f<group>&a，使用 &f/land group accept <group_id>&a 接受'
@@ -138,11 +138,15 @@ command:
     forbidden: '<prefix> &c你的角色没有从该领地银行取款的权限'
     empty: '<prefix> &c领地银行余额不足'
   admin:
-    usage: '<prefix> &e用法：&f/land admin claim|unclaim [半径]&7，&ftransfer <玩家>&7，&frelease <领地ID>&7，&fexempt <true|false>&7，&frename <新名字>&7，&finfo&7，&forphans&7，&frun'
+    usage: '<prefix> &e用法：&f/land admin claim|unclaim [radius <半径>|auto]&7，&ftransfer <玩家>&7，&frelease <领地ID>&7，&fexempt <true|false>&7，&frename <新名字>&7，&finfo&7，&forphans&7，&frun'
     claim:
       success: '<prefix> &a已创建管理领地（server 所有），本次纳入 &f<count>&a 个区块，不受额度与相邻规则限制且豁免维护费'
+      auto_on: '<prefix> &a已开启行走自动管理认领：进入未认领区块时将自动创建/扩容管理领地（server 所有）'
+      auto_off: '<prefix> &e已关闭行走自动管理认领'
     unclaim:
       success: '<prefix> &e已强制放弃 &f<count>&e 个区块（不校验归属，不返还额度）'
+      auto_on: '<prefix> &a已开启行走自动强制放弃：进入任何已认领区块时将自动移除该区块（不校验归属，不返还额度）'
+      auto_off: '<prefix> &e已关闭行走自动强制放弃'
     release:
       success: '<prefix> &e已强制释放领地 &f<claim>&e（&f<chunks>&e 个区块归还野外）'
     transfer:
@@ -307,7 +311,7 @@ menu:
       rename_prompt: '<prefix> &e请在聊天中输入新的组织展示名，输入 &fcancel &e取消'
       disband_name: '&c解散组织'
       disband_lore: '&7Shift+左键点击确认解散'
-      disband_confirm: '<prefix> &c解散不可撤销，请按住 &fShift &c再左键点击该图标确认'
+      disband_confirm: '<prefix> &c解散不可撤销，名下领地将一并释放；请按住 &fShift &c再左键点击该图标确认'
       leave_name: '&e退出组织'
       leave_lore: '&7退出后组内领地权限立即收回'
       accept_name: '&a接受邀请'

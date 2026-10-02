@@ -17,6 +17,7 @@ import pers.yufiria.landguard.identity.IdentityPermissions;
 import pers.yufiria.landguard.identity.PermissionPoint;
 import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.owner.OwnerRef;
+import pers.yufiria.landguard.owner.builtin.server.ServerClaimOwner;
 import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
@@ -36,9 +37,9 @@ public enum AutoModeManager implements Listener {
 
     INSTANCE;
 
-    /** 行走自动模式：关闭 / 进入新区块自动认领 / 进入新区块自动放弃（本人的个人领地，或本人所在组内拥有放弃权限的身份所持的组领地，默认领袖与管理者）。 */
+    /** 行走自动模式：关闭 / 进入新区块自动认领 / 进入新区块自动放弃（本人的个人领地，或本人所在组内拥有放弃权限的身份所持的组领地）；ADMIN_* 为管理员变体，仅对拥有对应管理命令权限的玩家生效。 */
     public enum Mode {
-        OFF, CLAIM, UNCLAIM
+        OFF, CLAIM, UNCLAIM, ADMIN_CLAIM, ADMIN_UNCLAIM
     }
 
     /**
@@ -51,6 +52,10 @@ public enum AutoModeManager implements Listener {
     }
 
     private static final long FAILURE_THROTTLE_MILLIS = 3000L;
+
+    /** 与 {@code /land admin claim}、{@code /land admin unclaim} 节点同名的权限：行走期间每次行动前复核，收回后自动关闭管理模式。 */
+    private static final String ADMIN_CLAIM_PERMISSION = "landguard.command.admin.claim";
+    private static final String ADMIN_UNCLAIM_PERMISSION = "landguard.command.admin.unclaim";
 
     private final Map<UUID, AutoState> states = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> lastFailureNotice = new ConcurrentHashMap<>();
@@ -100,6 +105,8 @@ public enum AutoModeManager implements Listener {
         switch (state.mode()) {
             case CLAIM -> attemptClaim(commonPlayer, target, state.groupId());
             case UNCLAIM -> attemptUnclaim(commonPlayer, target);
+            case ADMIN_CLAIM -> attemptAdminClaim(commonPlayer, target);
+            case ADMIN_UNCLAIM -> attemptAdminUnclaim(commonPlayer, target);
             default -> {
             }
         }
@@ -156,6 +163,49 @@ public enum AutoModeManager implements Listener {
                 return;
             }
             ClaimMessages.unclaimSuccess(player, result);
+        });
+    }
+
+    /** 管理自动认领：以 server 虚拟所有者创建/扩容管理领地（admin 标记，跳过相邻与额度限制）。 */
+    private void attemptAdminClaim(CommonPlayer player, ChunkLoc target) {
+        // 已被占用的区块（含本人领地）静默跳过：不写库、不提示
+        if (DataStore.INSTANCE.snapshot().claimIdByChunk().containsKey(target)) {
+            return;
+        }
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
+        if (!bukkitPlayer.hasPermission(ADMIN_CLAIM_PERMISSION)) {
+            states.remove(player.uniqueId());
+            if (shouldNotify(player.uniqueId())) {
+                LangUtils.sendLang(player, Languages.COMMAND_NO_PERM);
+            }
+            return;
+        }
+        List<ChunkLoc> targets = List.of(target);
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.claim(
+            OwnerRef.of(BuiltinOwnerTypes.SERVER, ServerClaimOwner.ID), target.worldUuid(), targets,
+            ClaimService.ADMIN_CLAIM_NAME, true), result -> {
+            if (result.success()) {
+                LangUtils.sendLang(player, Languages.COMMAND_ADMIN_CLAIM_SUCCESS, Map.of(
+                    "<count>", String.valueOf(result.affectedChunks())));
+            }
+        });
+    }
+
+    /** 管理自动强制放弃：不校验归属，进入已认领区块即移除该区块（野外静默跳过）。 */
+    private void attemptAdminUnclaim(CommonPlayer player, ChunkLoc target) {
+        Player bukkitPlayer = CommandUtils.bukkitPlayer(player);
+        if (!bukkitPlayer.hasPermission(ADMIN_UNCLAIM_PERMISSION)) {
+            states.remove(player.uniqueId());
+            if (shouldNotify(player.uniqueId())) {
+                LangUtils.sendLang(player, Languages.COMMAND_NO_PERM);
+            }
+            return;
+        }
+        AsyncReply.toPlayer(bukkitPlayer, ClaimService.INSTANCE.adminUnclaim(List.of(target)), result -> {
+            if (result.success()) {
+                LangUtils.sendLang(player, Languages.COMMAND_ADMIN_UNCLAIM_SUCCESS, Map.of(
+                    "<count>", String.valueOf(result.affectedChunks())));
+            }
         });
     }
 

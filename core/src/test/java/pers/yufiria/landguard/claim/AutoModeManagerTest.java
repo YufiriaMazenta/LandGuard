@@ -85,4 +85,30 @@ public class AutoModeManagerTest {
         assertEquals(AutoModeManager.Mode.OFF, AutoModeManager.INSTANCE.stateOf(second).mode());
     }
 
+    @Test
+    void adminModesToggleAndReplaceEachOther() {
+        UUID player = UUID.randomUUID();
+
+        // 管理模式不涉及组身份
+        AutoModeManager.AutoState adminClaim = AutoModeManager.INSTANCE.toggle(
+            player, AutoModeManager.Mode.ADMIN_CLAIM);
+        assertEquals(AutoModeManager.Mode.ADMIN_CLAIM, adminClaim.mode());
+        assertNull(adminClaim.groupId());
+
+        // 同模式再切即关闭
+        assertEquals(AutoModeManager.AutoState.OFF,
+            AutoModeManager.INSTANCE.toggle(player, AutoModeManager.Mode.ADMIN_CLAIM));
+
+        // 管理认领 / 管理放弃 / 普通模式共用一个状态槽：切到另一种模式即替换
+        AutoModeManager.INSTANCE.toggle(player, AutoModeManager.Mode.ADMIN_CLAIM);
+        assertEquals(AutoModeManager.Mode.ADMIN_UNCLAIM,
+            AutoModeManager.INSTANCE.toggle(player, AutoModeManager.Mode.ADMIN_UNCLAIM).mode());
+        assertEquals(AutoModeManager.Mode.CLAIM,
+            AutoModeManager.INSTANCE.toggle(player, AutoModeManager.Mode.CLAIM).mode());
+
+        // 收尾
+        AutoModeManager.INSTANCE.toggle(player, AutoModeManager.Mode.CLAIM);
+        assertEquals(AutoModeManager.Mode.OFF, AutoModeManager.INSTANCE.stateOf(player).mode());
+    }
+
 }

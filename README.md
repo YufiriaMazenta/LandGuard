@@ -70,12 +70,13 @@ LandGuard 以 **16×16 区块**为最小领地单位，所有权通过 SPI 抽�
 | `/land boundary` | 切换进入领地时的粒子边界渲染（按玩家，默认开启） |
 | `/land rename <新名字>` | 重命名脚下领地（仅该领地所有者，名字可含空格，最长 32 字符） |
 | `/land transfer --player <玩家名>` / `--group <组标识符>` | 把脚下领地转让给其他玩家或用户组（仅该领地所有者） |
-| `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|rename\|role\|list\|info` | 用户组管理（`transfer` 为转让组领袖，`rename` 改展示名） |
+| `/land group create\|disband\|invite\|accept\|deny\|leave\|kick\|transfer\|rename\|role\|list\|info` | 用户组管理（`transfer` 为转让组领袖，`rename` 改展示名；解散会一并释放该组名下全部领地） |
 | `/land group role assign <组标识符> <玩家> <身份>` | 指派成员身份（身份来自 `identities.yml`） |
 | `/land group role list [组标识符]` | 列出全部身份（id / 展示名 / 优先级 / 权限数 / 行为数）；给出组标识符时附带该组内各身份的成员数 |
 | `/land buy <数量>` / `/land sell <数量>` | 买卖区块额度（需经济） |
 | `/land bank [deposit\|withdraw <金额>]` | 领地银行（需经济） |
-| `/land admin claim\|unclaim\|transfer\|release\|exempt\|rename\|info\|orphans\|run` | 管理操作 |
+| `/land admin claim\|unclaim [radius <r> \| auto]` | 管理领地创建 / 强制放弃：无参就地 3×3，`radius` 方形批量，`auto` 切换行走自动（认领为 server 所有，放弃不校验归属） |
+| `/land admin transfer\|release\|exempt\|rename\|info\|orphans\|run` | 强制转让 / 释放 / 豁免维护费 / 重命名 / 信息 / 孤儿清单 / 手动执行回收周期 |
 | `/land reload` / `/land version` | 重载 / 版本 |
 
 别名：`landguard`、`lg`（可在 `config.yml` 修改）。
