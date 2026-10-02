@@ -13,7 +13,7 @@ LandGuard protects land at the granularity of **16×16 chunks**. Ownership is ab
 - **Organization-first**: built-in groups (invites / identities / transfer / claim gifting) plus an open ownership SPI for third-party organization systems
 - **Identity × flag model**: identities such as owner / manager / member / visitor are all defined in `identities.yml` (server-wide, groups cannot define their own), and each identity independently configures group-management permissions and in-claim behavior flags
 - **Comprehensive protection vectors**: place / break / container / door / redstone / crafting / vehicle / animal / interaction entity / planting / harvest / item / bank; PvP / explosion / fire spread / fluid flow / piston / mob spawn / mob grief / trample. Cross-boundary pistons and fluids are decided by the target chunk
-- **GUI management**: `/land` opens the claim list, detail view, tri-state flag cycling, members and claim bank menus
+- **GUI management**: `/land` opens the claim list, detail view, tri-state flag cycling, members and claim bank menus; the same entry's "My groups" manages user groups (list / create / assign member identities / invite / rename / disband / transfer leadership), equivalent to the commands
 - **Economy**: optional Vault hook for quota trading, claim banks, periodic upkeep and debt grace periods
 - **Lifecycle governance**: three configurable auto-reclaim chains — upkeep debt, inactivity, and orphaned owners (missing owner entities)
 - **Admin tooling**: force-claim (server-owned), force unclaim / release / transfer, upkeep exemption, orphan listing, manual maintenance run

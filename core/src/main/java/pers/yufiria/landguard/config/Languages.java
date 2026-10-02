@@ -187,6 +187,8 @@ public class Languages {
     public static final StringLangEntry MENU_LIST_EMPTY = new StringLangEntry("menu.list.empty");
     public static final StringLangEntry MENU_LIST_CLAIM_HERE_NAME = new StringLangEntry("menu.list.claim_here_name");
     public static final StringLangEntry MENU_LIST_CLAIM_HERE_LORE = new StringLangEntry("menu.list.claim_here_lore");
+    public static final StringLangEntry MENU_LIST_GROUP_NAME = new StringLangEntry("menu.list.group_name");
+    public static final StringLangEntry MENU_LIST_GROUP_LORE = new StringLangEntry("menu.list.group_lore");
 
     public static final StringLangEntry MENU_DETAIL_TITLE = new StringLangEntry("menu.detail.title");
     public static final StringLangEntry MENU_DETAIL_INFO_NAME = new StringLangEntry("menu.detail.info_name");
@@ -253,6 +255,55 @@ public class Languages {
     public static final StringLangEntry MENU_MEMBERS_NO_PERMISSION = new StringLangEntry("menu.members.no_permission");
     public static final StringLangEntry MENU_MEMBERS_EMPTY = new StringLangEntry("menu.members.empty");
     public static final StringLangEntry MENU_MEMBERS_HINT = new StringLangEntry("menu.members.hint");
+
+    public static final StringLangEntry MENU_GROUP_NO_PERMISSION = new StringLangEntry("menu.group.no_permission");
+
+    public static final StringLangEntry MENU_GROUP_LIST_TITLE = new StringLangEntry("menu.group.list.title");
+    public static final StringLangEntry MENU_GROUP_LIST_ENTRY_NAME = new StringLangEntry("menu.group.list.entry_name");
+    public static final StringLangEntry MENU_GROUP_LIST_ENTRY_ID = new StringLangEntry("menu.group.list.entry_id");
+    public static final StringLangEntry MENU_GROUP_LIST_ENTRY_LEADER = new StringLangEntry("menu.group.list.entry_leader");
+    public static final StringLangEntry MENU_GROUP_LIST_ENTRY_MEMBERS = new StringLangEntry("menu.group.list.entry_members");
+    public static final StringLangEntry MENU_GROUP_LIST_ENTRY_ROLE = new StringLangEntry("menu.group.list.entry_role");
+    public static final StringLangEntry MENU_GROUP_LIST_EMPTY = new StringLangEntry("menu.group.list.empty");
+    public static final StringLangEntry MENU_GROUP_LIST_INVITES_NAME = new StringLangEntry("menu.group.list.invites_name");
+    public static final StringLangEntry MENU_GROUP_LIST_INVITES_LORE = new StringLangEntry("menu.group.list.invites_lore");
+    public static final StringLangEntry MENU_GROUP_LIST_CREATE_NAME = new StringLangEntry("menu.group.list.create_name");
+    public static final StringLangEntry MENU_GROUP_LIST_CREATE_LORE = new StringLangEntry("menu.group.list.create_lore");
+    public static final StringLangEntry MENU_GROUP_LIST_CREATE_PROMPT = new StringLangEntry("menu.group.list.create_prompt");
+
+    public static final StringLangEntry MENU_GROUP_DETAIL_TITLE = new StringLangEntry("menu.group.detail.title");
+    public static final StringLangEntry MENU_GROUP_DETAIL_INFO_CHUNKS = new StringLangEntry("menu.group.detail.info_chunks");
+    public static final StringLangEntry MENU_GROUP_DETAIL_MEMBERS_NAME = new StringLangEntry("menu.group.detail.members_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_MEMBERS_LORE = new StringLangEntry("menu.group.detail.members_lore");
+    public static final StringLangEntry MENU_GROUP_DETAIL_INVITE_NAME = new StringLangEntry("menu.group.detail.invite_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_INVITE_LORE = new StringLangEntry("menu.group.detail.invite_lore");
+    public static final StringLangEntry MENU_GROUP_DETAIL_INVITE_PROMPT = new StringLangEntry("menu.group.detail.invite_prompt");
+    public static final StringLangEntry MENU_GROUP_DETAIL_RENAME_NAME = new StringLangEntry("menu.group.detail.rename_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_RENAME_LORE = new StringLangEntry("menu.group.detail.rename_lore");
+    public static final StringLangEntry MENU_GROUP_DETAIL_RENAME_PROMPT = new StringLangEntry("menu.group.detail.rename_prompt");
+    public static final StringLangEntry MENU_GROUP_DETAIL_DISBAND_NAME = new StringLangEntry("menu.group.detail.disband_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_DISBAND_LORE = new StringLangEntry("menu.group.detail.disband_lore");
+    public static final StringLangEntry MENU_GROUP_DETAIL_DISBAND_CONFIRM = new StringLangEntry("menu.group.detail.disband_confirm");
+    public static final StringLangEntry MENU_GROUP_DETAIL_LEAVE_NAME = new StringLangEntry("menu.group.detail.leave_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_LEAVE_LORE = new StringLangEntry("menu.group.detail.leave_lore");
+    public static final StringLangEntry MENU_GROUP_DETAIL_ACCEPT_NAME = new StringLangEntry("menu.group.detail.accept_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_ACCEPT_LORE = new StringLangEntry("menu.group.detail.accept_lore");
+    public static final StringLangEntry MENU_GROUP_DETAIL_DENY_NAME = new StringLangEntry("menu.group.detail.deny_name");
+    public static final StringLangEntry MENU_GROUP_DETAIL_DENY_LORE = new StringLangEntry("menu.group.detail.deny_lore");
+
+    public static final StringLangEntry MENU_GROUP_MEMBERS_TITLE = new StringLangEntry("menu.group.members.title");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_ENTRY_ROLE = new StringLangEntry("menu.group.members.entry_role");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_ENTRY_ASSIGN = new StringLangEntry("menu.group.members.entry_assign");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_ENTRY_KICK = new StringLangEntry("menu.group.members.entry_kick");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_ENTRY_TRANSFER = new StringLangEntry("menu.group.members.entry_transfer");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_ENTRY_READONLY = new StringLangEntry("menu.group.members.entry_readonly");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_EMPTY = new StringLangEntry("menu.group.members.empty");
+    public static final StringLangEntry MENU_GROUP_MEMBERS_HINT = new StringLangEntry("menu.group.members.hint");
+
+    public static final StringLangEntry MENU_GROUP_INVITES_TITLE = new StringLangEntry("menu.group.invites.title");
+    public static final StringLangEntry MENU_GROUP_INVITES_ENTRY_GROUP = new StringLangEntry("menu.group.invites.entry_group");
+    public static final StringLangEntry MENU_GROUP_INVITES_ENTRY_ACTION = new StringLangEntry("menu.group.invites.entry_action");
+    public static final StringLangEntry MENU_GROUP_INVITES_EMPTY = new StringLangEntry("menu.group.invites.empty");
 
     public static final StringLangEntry MENU_BANK_TITLE = new StringLangEntry("menu.bank.title");
     public static final StringLangEntry MENU_BANK_BALANCE_NAME = new StringLangEntry("menu.bank.balance_name");

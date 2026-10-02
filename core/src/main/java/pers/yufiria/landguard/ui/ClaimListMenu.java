@@ -42,7 +42,7 @@ public class ClaimListMenu extends Menu {
         ".........",
         ".........",
         ".........",
-        "pgggcgggn"
+        "pgggcggon"
     );
 
     private int page;
@@ -66,6 +66,7 @@ public class ClaimListMenu extends Menu {
         icons.put('n', () -> MenuSupport.arrow(player().orElse(null), true, page < maxPage(),
             () -> changePage(page + 1)));
         icons.put('c', this::claimHereIcon);
+        icons.put('o', this::groupIcon);
         return new MenuDisplay(title(), new MenuLayout(LAYOUT, icons));
     }
 
@@ -107,6 +108,21 @@ public class ClaimListMenu extends Menu {
             return icon;
         }
         icon.setClickAction(event -> claimHere());
+        return icon;
+    }
+
+    /** 组织 GUI 入口：与命令树等价的组织管理都在 {@link GroupListMenu} 中完成。 */
+    private Icon groupIcon() {
+        Player player = player().orElse(null);
+        Icon icon = MenuSupport.icon(Material.SHIELD,
+            MenuSupport.text(player, Languages.MENU_LIST_GROUP_NAME),
+            List.of(MenuSupport.text(player, Languages.MENU_LIST_GROUP_LORE)));
+        icon.setClickAction(event -> {
+            Player clicker = player().orElse(null);
+            if (clicker != null) {
+                new GroupListMenu(clicker).openMenu();
+            }
+        });
         return icon;
     }
 

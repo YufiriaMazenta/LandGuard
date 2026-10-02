@@ -17,7 +17,6 @@ import pers.yufiria.landguard.identity.Identity;
 import pers.yufiria.landguard.identity.IdentityPermissions;
 import pers.yufiria.landguard.identity.IdentityRegistry;
 import pers.yufiria.landguard.identity.PermissionPoint;
-import pers.yufiria.landguard.owner.BuiltinOwnerTypes;
 import pers.yufiria.landguard.util.AsyncReply;
 import pers.yufiria.landguard.util.CommandUtils;
 import pers.yufiria.landguard.util.LangUtils;
@@ -33,6 +32,9 @@ import java.util.function.Supplier;
  * 成员身份选择菜单：列出 {@code identities.yml} 定义的全部身份，点击把该成员指派为对应身份。
  * <p>
  * 身份来自全服配置（{@link IdentityRegistry#all()}，优先级降序），当前生效身份追加高亮行。
+ * 两个入口共用同一实现：组领地的成员页按 {@code claimId} 反查所属用户组，
+ * 组织 GUI（{@link GroupMembersMenu}）直接传入用户组标识符。
+ * <p>
  * GUI 点击不走命令框架的权限节点，因此点击时自行复核
  * {@link PermissionPoint#GROUP_ASSIGN}；服务层 {@link GroupService#assignRole} 还会再做一次
  * 授权与层级校验（同优先级/上级成员不可操作），此处不重复实现层级规则。
@@ -53,17 +55,25 @@ public class MemberIdentityMenu extends Menu {
         Material.IRON_HELMET, Material.CHAINMAIL_HELMET, Material.LEATHER_HELMET);
 
     private final Player viewer;
-    private final String claimId;
+    private final String groupId;
     private final UUID memberId;
-    private final int listPage;
+    private final Runnable onBack;
 
+    /** 组领地成员页入口：由 {@code claimId} 反查组标识符，返回时重开该领地的成员页。 */
     public MemberIdentityMenu(@NotNull Player viewer, @NotNull String claimId,
                               @NotNull UUID memberId, int listPage) {
+        this(viewer, groupIdOf(claimId), memberId,
+            () -> new MembersMenu(viewer, claimId, listPage).openMenu());
+    }
+
+    /** 组织 GUI 入口：直接给出用户组标识符与返回动作。 */
+    public MemberIdentityMenu(@NotNull Player viewer, @NotNull String groupId,
+                              @NotNull UUID memberId, @NotNull Runnable onBack) {
         super(viewer);
         this.viewer = viewer;
-        this.claimId = claimId;
+        this.groupId = groupId;
         this.memberId = memberId;
-        this.listPage = listPage;
+        this.onBack = onBack;
         this.display = buildDisplay();
     }
 
@@ -71,8 +81,7 @@ public class MemberIdentityMenu extends Menu {
         Player player = player().orElse(null);
         Map<Character, Supplier<Icon>> icons = new LinkedHashMap<>();
         icons.put('g', MenuSupport::glass);
-        icons.put('r', () -> MenuSupport.backIcon(player,
-            () -> new MembersMenu(player, claimId, listPage).openMenu()));
+        icons.put('r', () -> MenuSupport.backIcon(player, onBack));
         return new MenuDisplay(title(), new MenuLayout(LAYOUT, icons));
     }
 
@@ -86,10 +95,7 @@ public class MemberIdentityMenu extends Menu {
     public void onLayoutUpdated() {
         Player player = player().orElse(null);
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        ClaimData claim = snapshot.claimsById().get(claimId);
-        String groupId = claim == null ? null : claim.getOwnerId();
-        String currentId = groupId == null ? null
-            : IdentityPermissions.identityOf(snapshot, groupId, memberId).id();
+        String currentId = IdentityPermissions.memberIdentityIdOf(snapshot, groupId, memberId);
         int slot = 0;
         int otherIndex = 0;
         for (Identity identity : IdentityRegistry.INSTANCE.all()) {
@@ -119,17 +125,10 @@ public class MemberIdentityMenu extends Menu {
             return;
         }
         DataSnapshot snapshot = DataStore.INSTANCE.snapshot();
-        ClaimData claim = snapshot.claimsById().get(claimId);
-        if (claim == null || !BuiltinOwnerTypes.GROUP.equals(claim.getOwnerType())) {
-            LangUtils.sendLang(viewer, Languages.MENU_MEMBERS_NO_PERMISSION);
+        if (!IdentityPermissions.has(snapshot, groupId, viewer.getUniqueId(), PermissionPoint.GROUP_ASSIGN)) {
+            LangUtils.sendLang(viewer, Languages.MENU_GROUP_NO_PERMISSION);
             return;
         }
-        if (!IdentityPermissions.canActOnClaim(snapshot, claim, viewer.getUniqueId(),
-            PermissionPoint.GROUP_ASSIGN)) {
-            LangUtils.sendLang(viewer, Languages.MENU_MEMBERS_NO_PERMISSION);
-            return;
-        }
-        String groupId = claim.getOwnerId();
         AsyncReply.toPlayer(viewer,
             GroupService.INSTANCE.assignRole(viewer.getUniqueId(), groupId, memberId, identity.id()),
             result -> {
@@ -138,11 +137,18 @@ public class MemberIdentityMenu extends Menu {
                         "<group>", groupId,
                         "<player>", MenuSupport.displayName(memberId),
                         "<role>", identity.name()));
-                    new MembersMenu(viewer, claimId, listPage).openMenu();
+                    // 指派成功：回到成员页看到新身份；失败则留在本页便于改选其他身份
+                    onBack.run();
                 } else {
                     GroupCommand.sendFailure(CommandUtils.commonPlayer(viewer), result);
                 }
             });
+    }
+
+    /** 组领地成员页只对用户组领地开放该菜单，故按 claimId 反查组标识符即可；查不到返回空串（必然无权）。 */
+    private static String groupIdOf(String claimId) {
+        ClaimData claim = DataStore.INSTANCE.snapshot().claimsById().get(claimId);
+        return claim == null ? "" : claim.getOwnerId();
     }
 
     @Override

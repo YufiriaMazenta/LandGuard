@@ -1,21 +1,16 @@
 package pers.yufiria.landguard.ui;
 
-import crypticlib.CommonPlayer;
-import crypticlib.conversation.Conversation;
-import crypticlib.conversation.Prompt;
 import crypticlib.lang.entry.StringLangEntry;
 import crypticlib.ui.display.Icon;
 import crypticlib.ui.display.MenuDisplay;
 import crypticlib.ui.display.MenuLayout;
 import crypticlib.ui.menu.Menu;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import net.md_5.bungee.api.chat.BaseComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import pers.yufiria.landguard.LandGuard;
 import pers.yufiria.landguard.claim.ClaimMessages;
 import pers.yufiria.landguard.claim.ClaimService;
 import pers.yufiria.landguard.command.TransferCommand;
@@ -218,25 +213,16 @@ public class ClaimDetailMenu extends Menu {
         if (player == null) {
             return;
         }
-        player.closeInventory();
-        CommonPlayer commonPlayer = CommandUtils.commonPlayer(player);
-        new Conversation(LandGuard.instance(), player,
-            new TextInputPrompt(commonPlayer, Languages.MENU_DETAIL_RENAME_PROMPT, NAME_KEY), "cancel", data -> {
-            // 取消或超时时会话数据里没有名字，直接结束
-            Object input = data.get(NAME_KEY);
-            if (!(input instanceof String raw)) {
-                return;
-            }
+        ChatPrompt.ask(player, Languages.MENU_DETAIL_RENAME_PROMPT, raw ->
             AsyncReply.toPlayer(player, ClaimService.INSTANCE.renameClaim(player.getUniqueId(), claimId, raw), result -> {
                 if (result.success()) {
-                    LangUtils.sendLang(commonPlayer, Languages.COMMAND_RENAME_SUCCESS,
+                    LangUtils.sendLang(CommandUtils.commonPlayer(player), Languages.COMMAND_RENAME_SUCCESS,
                         Map.of("<name>", ClaimService.normalizeClaimName(raw)));
                     new ClaimDetailMenu(player, claimId, listPage).openMenu();
                 } else {
-                    ClaimMessages.failure(commonPlayer, result.failureReason());
+                    ClaimMessages.failure(CommandUtils.commonPlayer(player), result.failureReason());
                 }
-            });
-        }).start();
+            }));
     }
 
     /**
@@ -248,47 +234,10 @@ public class ClaimDetailMenu extends Menu {
         if (player == null) {
             return;
         }
-        player.closeInventory();
-        CommonPlayer commonPlayer = CommandUtils.commonPlayer(player);
-        new Conversation(LandGuard.instance(), player,
-            new TextInputPrompt(commonPlayer, Languages.MENU_DETAIL_TRANSFER_PROMPT, TARGET_KEY), "cancel", data -> {
-            Object input = data.get(TARGET_KEY);
-            if (!(input instanceof String raw) || raw.isBlank()) {
-                return;
-            }
-            TransferCommand.transfer(commonPlayer, player, claimId, List.of(raw.trim().split("\\s+")),
-                () -> new ClaimListMenu(player, listPage).openMenu());
-        }).start();
-    }
-
-    /** 会话数据里存放玩家输入的键。 */
-    private static final String NAME_KEY = "name";
-    private static final String TARGET_KEY = "target";
-
-    /** 单行文本输入提示：把玩家输入写进会话数据后返回 null 结束会话，文案走 LangUtils 的组件出口。 */
-    private static final class TextInputPrompt implements Prompt {
-
-        private final CommonPlayer player;
-        private final StringLangEntry promptEntry;
-        private final String dataKey;
-
-        private TextInputPrompt(CommonPlayer player, StringLangEntry promptEntry, String dataKey) {
-            this.player = player;
-            this.promptEntry = promptEntry;
-            this.dataKey = dataKey;
-        }
-
-        @Override
-        public Prompt acceptInput(Map<Object, Object> conversationData, String input) {
-            conversationData.put(dataKey, input);
-            return null;
-        }
-
-        @Override
-        public BaseComponent promptText(Map<Object, Object> conversationData) {
-            return LangUtils.component(player, promptEntry, Map.of());
-        }
-
+        ChatPrompt.ask(player, Languages.MENU_DETAIL_TRANSFER_PROMPT, input ->
+            TransferCommand.transfer(CommandUtils.commonPlayer(player), player, claimId,
+                List.of(input.split("\\s+")),
+                () -> new ClaimListMenu(player, listPage).openMenu()));
     }
 
 }
